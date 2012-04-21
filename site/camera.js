@@ -4,6 +4,7 @@
     settings = settings || {};
     this.distance = 1000.0;
     this.lookat = [0,0];
+    this.rotation = 0;
     this.context = context;
     this.fieldOfView = settings.fieldOfView || Math.PI / 4.0;
     this.viewport = {
@@ -23,12 +24,16 @@
       this.context.save();
       this.applyScale();
       this.applyTranslation();
+      this.applyRotation();
     },
     end: function() {
       this.context.restore();
     },
     applyScale: function() {
       this.context.scale(this.viewport.scale[0], this.viewport.scale[1]);
+    },
+    applyRotation: function() {
+      this.context.rotate(this.rotation);
     },
     applyTranslation: function() {
       this.context.translate(-this.viewport.left, -this.viewport.top);
@@ -52,6 +57,9 @@
       this.lookat[0] = x;
       this.lookat[1] = y;
       this.updateViewport();
+    },
+    rotate: function(value) {
+      this.rotation += value;
     },
     screenToWorld: function(x, y, obj) {
       obj = obj || {};

@@ -100,6 +100,7 @@
     this.packages = [];
     this.cachedResources = {};
   };
+
   Resources.prototype = {
     load: function(file, cb) {
       var self = this;  
@@ -196,24 +197,73 @@
   };
   _.extend(Quad.prototype, Eventable.prototype);
 
+  var Planet = function(id, texture, x, y, radius) {
+    Quad.call(this);
+    this.radius = radius;
+    this.id = id;
+    this.colour = GlobalResources.getTexture(texture);
+    this.height = this.width = (radius * 2.0);
+    this.x = x - radius;
+    this.y = y - radius;
+
+  };
+  Planet.prototype = {
+
+  };
+  _.extend(Planet.prototype, Quad.prototype)
+
+  var BasicMap = function() {
+
+  };
+  BasicMap.prototype = {
+    loadInto: function(scene) {
+      var planet = new Planet('centre', 'assets/basicplanet.png', 0, 0, 512);
+      scene.add(planet);
+      scene.camera.moveTo(0, -700);
+      scene.camera.zoomTo(1000);
+
+      // For testing purposes
+      scene.add(new Planet('sat1', 'assets/basicplanet.png', 100, -900, 50));
+      scene.add(new Planet('sat2', 'assets/basicplanet.png', 900, 0, 80));
+      scene.add(new Planet('sat3', 'assets/basicplanet.png', 100, 900, 90));
+      scene.add(new Planet('sat4', 'assets/basicplanet.png', -900, 0, 100));
+    }
+  };
+
+  var Controller = function(scene) {
+    this.scene = scene;
+    this.hookEvents();
+  };
+
+  Controller.prototype = {
+    hookEvents: function() {
+      var self = this;
+      document.onkeyup = function(e) {
+        switch(e.keyCode) {
+          case 39:
+            self.scene.camera.rotate(-0.01);
+          break;
+          case 37:
+            self.scene.camera.rotate(0.01);
+          break;
+        }
+      };
+    }
+  };
 
   var Game = function() {
     this.canvas = document.getElementById('target');
     this.context = this.canvas.getContext('2d');
     this.camera = new Camera(this.context);
     this.scene = new Scene(this.camera);
-    var test = new Quad();
-    test.id = "bob";
-    this.scene.add(test);
-
-    this.camera.moveTo(0,0);
-    this.camera.zoomTo(1000);
+    this.controller = new Controller(this.scene);
   };
 
   Game.prototype = {
     start: function() {
       var self = this;
       GlobalResources.load('assets.json', function() {
+        self.loadMap(new BasicMap())
         self.startTimers();
       });
     },
@@ -221,8 +271,12 @@
       var self = this;
       setInterval(function() {
         self.scene.tick();
+        self.canvas.width = self.canvas.width;
         self.scene.draw(self.context);
       }, 100 / 3);
+    },
+    loadMap: function(map) {
+      map.loadInto(this.scene);
     }
   };
 
