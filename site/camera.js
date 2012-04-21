@@ -58,6 +58,9 @@
       this.lookat[1] = y;
       this.updateViewport();
     },
+    rotateTo: function(angle) {
+      this.rotation = angle;
+    },
     rotate: function(value) {
       this.rotation += value;
     },

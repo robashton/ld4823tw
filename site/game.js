@@ -150,9 +150,13 @@
   Scene.prototype = {
     add: function(entity) {
       this.entities[entity.id] = entity;
+      entity.scene = this;
+      entity.onAny(this.onEntityEvent, this);
     },
     remove: function(entity) {
       delete this.entities[entity.id];
+      entity.scene = null;
+      entity.offAny(this.onEntityEvent, this);
     },
     tick: function() {
       this.each(function(entity) {
@@ -168,11 +172,18 @@
       });
       this.camera.end();
     },
+    with: function(id, cb) {
+      var entity = this.entities[id];
+      if(entity) cb(entity);
+    },
     each: function(cb) {
       for(var i in this.entities) {
         var entity = this.entities[i];
         cb(entity);
       }
+    },
+    onEntityEvent: function(e, sender) {
+      this.raise(e.event, e.data, sender);
     }
   };
   _.extend(Scene.prototype, Eventable.prototype);
@@ -184,15 +195,21 @@
     this.y = -2;
     this.width = 4;
     this.height = 4;
+    this.rotation = 0;
   };
   Quad.prototype = {
     draw: function(context) {
+      context.save();
+      context.translate(this.x + this.width / 2.0, this.y + this.height / 2.0);
+      context.rotate(this.rotation);
+      context.translate(-this.width / 2.0, -this.height / 2.0);
       if(this.colour instanceof Image)
-        context.drawImage(this.colour, this.x, this.y, this.width, this.height);
+        context.drawImage(this.colour, 0, 0, this.width, this.height);
       else {
         context.fillStyle = this.colour;
-        context.fillRect(this.x, this.y, this.width, this.height);
+        context.fillRect(0, 0, this.width, this.height);
       }
+      context.restore();
     }
   };
   _.extend(Quad.prototype, Eventable.prototype);
@@ -208,17 +225,52 @@
 
   };
   Planet.prototype = {
-
+    placeOnSurface: function(entity, angle) {
+      var x = (this.x + this.radius) + (this.radius * Math.cos(angle));
+      var y = (this.y + this.radius) + (this.radius * Math.sin(angle));
+      entity.x = x;
+      entity.y = y - entity.height;
+      entity.rotation = angle;
+    }
   };
-  _.extend(Planet.prototype, Quad.prototype)
+  _.extend(Planet.prototype, Quad.prototype);
+
+  var Player = function() {
+    Quad.call(this);
+    this.id = 'player';
+    this.angle = 0;
+    this.colour = '#FFF';
+    this.width = 20;
+    this.height = 10;
+    this.x = 0;
+    this.y = -530;
+  };
+  Player.prototype = {
+    tick: function() {
+      this.angle += 0.04;
+      this.updateRenderCoords();
+    },
+    updateRenderCoords: function() {
+      var self = this;
+      this.scene.with('centre', function(planet) {
+        planet.placeOnSurface(self, self.angle - (Math.PI / 2));
+      });
+      this.raise('Updated');
+    }
+  };
+  _.extend(Player.prototype, Quad.prototype);
 
   var BasicMap = function() {
 
   };
   BasicMap.prototype = {
     loadInto: function(scene) {
+
+      // Create the planet we're protecting
       var planet = new Planet('centre', 'assets/basicplanet.png', 0, 0, 512);
       scene.add(planet);
+
+      // Start off above the polar north of the planet
       scene.camera.moveTo(0, -700);
       scene.camera.zoomTo(1000);
 
@@ -227,6 +279,9 @@
       scene.add(new Planet('sat2', 'assets/basicplanet.png', 900, 0, 80));
       scene.add(new Planet('sat3', 'assets/basicplanet.png', 100, 900, 90));
       scene.add(new Planet('sat4', 'assets/basicplanet.png', -900, 0, 100));
+    },
+    getSurfaceHeight: function() {
+      return 512;
     }
   };
 
@@ -237,17 +292,12 @@
 
   Controller.prototype = {
     hookEvents: function() {
-      var self = this;
-      document.onkeyup = function(e) {
-        switch(e.keyCode) {
-          case 39:
-            self.scene.camera.rotate(-0.01);
-          break;
-          case 37:
-            self.scene.camera.rotate(0.01);
-          break;
-        }
-      };
+      this.scene.on('Updated', this.onEntityUpdated, this);
+
+    },
+    onEntityUpdated: function(data, sender) {
+      if(sender.id !== 'player') return;
+      this.scene.camera.rotateTo(-sender.angle);
     }
   };
 
@@ -264,6 +314,7 @@
       var self = this;
       GlobalResources.load('assets.json', function() {
         self.loadMap(new BasicMap())
+        self.createPlayer();
         self.startTimers();
       });
     },
@@ -277,6 +328,10 @@
     },
     loadMap: function(map) {
       map.loadInto(this.scene);
+    },
+    createPlayer: function() {
+      var player = new Player();
+      this.scene.add(player);
     }
   };
 
