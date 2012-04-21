@@ -214,6 +214,12 @@
   };
   _.extend(Quad.prototype, Eventable.prototype);
 
+  IdGenerator = {
+    Next: function(prefix) {
+      return 'prefix' + Math.floor(Math.random() * 10000000);
+    }
+  };
+
   var Planet = function(id, texture, x, y, radius) {
     Quad.call(this);
     this.radius = radius;
@@ -276,30 +282,52 @@
   };
   _.extend(Player.prototype, Quad.prototype);
 
-  var BasicMap = function() {
-
+  var Asteroid = function(id, size, x, y, xvel, yvel) {
+    Quad.call(this);
+    this.id = id;
+    this.x = x;
+    this.y = y;
+    this.xvel = xvel;
+    this.yvel = yvel;
+    this.width = size;
+    this.height = size;
+    this.colour = GlobalResources.getTexture('assets/asteroid.png');
   };
-  BasicMap.prototype = {
-    loadInto: function(scene) {
-
-      // Create the planet we're protecting
-      var planet = new Planet('centre', 'assets/basicplanet.png', 0, 0, 512);
-      scene.add(planet);
-
-      // Start off above the polar north of the planet
-      scene.camera.moveTo(0, -700);
-      scene.camera.zoomTo(1000);
-
-      // For testing purposes
-      scene.add(new Planet('sat1', 'assets/basicplanet.png', 100, -900, 50));
-      scene.add(new Planet('sat2', 'assets/basicplanet.png', 900, 0, 80));
-      scene.add(new Planet('sat3', 'assets/basicplanet.png', 100, 900, 90));
-      scene.add(new Planet('sat4', 'assets/basicplanet.png', -900, 0, 100));
-    },
-    getSurfaceHeight: function() {
-      return 512;
+  Asteroid.prototype = {
+    tick: function() {
+      this.x += this.xvel;
+      this.y += this.yvel;
     }
   };
+  _.extend(Asteroid.prototype, Quad.prototype);
+
+  var EnemyFactory = function() {
+    Eventable.call(this);
+    this.id = "enemyfactory";
+    this.rate = 90;
+    this.ticks = 0;
+  };
+  EnemyFactory.prototype = {
+    tick: function() {
+      if(++this.ticks % this.rate === 0)
+        this.emit();
+    },
+    emit: function() {
+      var id = IdGenerator.Next('asteroid-');
+      var angle = Math.random() * (Math.PI * 2);
+      var size = 40 + Math.random() * 50;
+      var xdir = Math.cos(angle);
+      var ydir = Math.sin(angle);
+      var x = 1500 * xdir;
+      var y = 1500 * ydir;
+      var speed = 1.0 + Math.random() * 2.0;
+      var xvel = speed * (-xdir);
+      var yvel = speed * (-ydir);
+      var asteroid = new Asteroid(id, size, x, y, xvel, yvel);
+      this.scene.add(asteroid);
+    }
+  };
+  _.extend(EnemyFactory.prototype, Eventable.prototype);
 
   var Missile = function(id, x, y, xvel, yvel) {
     Quad.call(this);
@@ -330,7 +358,7 @@
       angle -= (Math.PI/2);
       var xvel = Math.cos(angle) * speed;
       var yvel = Math.sin(angle) * speed;
-      var id = 'missile-' + Math.floor(Math.random() * 10000000);
+      var id = IdGenerator.Next('missile-');
       var missile = new Missile(id, x, y, xvel, yvel);
       this.activeMissiles[id] = missile;
       this.scene.add(missile);
@@ -399,6 +427,33 @@
         else if(self.movingRight)
           player.moveRight();
       });
+    }
+  };
+
+  var BasicMap = function() {
+
+  };
+  BasicMap.prototype = {
+    loadInto: function(scene) {
+
+      // Create the planet we're protecting
+      var planet = new Planet('centre', 'assets/basicplanet.png', 0, 0, 512);
+      scene.add(planet);
+
+      // Start off above the polar north of the planet
+      scene.camera.moveTo(0, -700);
+      scene.camera.zoomTo(2000);
+
+      // For testing purposes
+      scene.add(new Planet('sat1', 'assets/basicplanet.png', 100, -900, 50));
+      scene.add(new Planet('sat2', 'assets/basicplanet.png', 900, 0, 80));
+      scene.add(new Planet('sat3', 'assets/basicplanet.png', 100, 900, 90));
+      scene.add(new Planet('sat4', 'assets/basicplanet.png', -900, 0, 100));
+
+      scene.add(new EnemyFactory());
+    },
+    getSurfaceHeight: function() {
+      return 512;
     }
   };
 
