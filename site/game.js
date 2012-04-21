@@ -140,12 +140,95 @@
   _.extend(Resources.prototype, Eventable.prototype);
   var GlobalResources = new Resources();
 
+  var Scene = function(camera) {
+    Eventable.call(this);
+    this.camera = camera;
+    this.entities = {};
+  };
+
+  Scene.prototype = {
+    add: function(entity) {
+      this.entities[entity.id] = entity;
+    },
+    remove: function(entity) {
+      delete this.entities[entity.id];
+    },
+    tick: function() {
+      this.each(function(entity) {
+        if(entity.tick)
+          entity.tick();
+      });
+    },
+    draw: function(context) {
+      this.camera.begin();
+      this.each(function(entity) {
+        if(entity.draw)
+          entity.draw(context);
+      });
+      this.camera.end();
+    },
+    each: function(cb) {
+      for(var i in this.entities) {
+        var entity = this.entities[i];
+        cb(entity);
+      }
+    }
+  };
+  _.extend(Scene.prototype, Eventable.prototype);
+
+  var Quad = function() {
+    Eventable.call(this);
+    this.colour = '#FFF';
+    this.x = -2;
+    this.y = -2;
+    this.width = 4;
+    this.height = 4;
+  };
+  Quad.prototype = {
+    draw: function(context) {
+      if(this.colour instanceof Image)
+        context.drawImage(this.colour, this.x, this.y, this.width, this.height);
+      else {
+        context.fillStyle = this.colour;
+        context.fillRect(this.x, this.y, this.width, this.height);
+      }
+    }
+  };
+  _.extend(Quad.prototype, Eventable.prototype);
 
 
+  var Game = function() {
+    this.canvas = document.getElementById('target');
+    this.context = this.canvas.getContext('2d');
+    this.camera = new Camera(this.context);
+    this.scene = new Scene(this.camera);
+    var test = new Quad();
+    test.id = "bob";
+    this.scene.add(test);
 
+    this.camera.moveTo(0,0);
+    this.camera.zoomTo(1000);
+  };
+
+  Game.prototype = {
+    start: function() {
+      var self = this;
+      GlobalResources.load('assets.json', function() {
+        self.startTimers();
+      });
+    },
+    startTimers: function() {
+      var self = this;
+      setInterval(function() {
+        self.scene.tick();
+        self.scene.draw(self.context);
+      }, 100 / 3);
+    }
+  };
 
 
   $(document).ready(function() {
-    console.log('packages loaded');
+    var game = new Game();
+    game.start();
   });
 })();
