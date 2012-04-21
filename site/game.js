@@ -213,7 +213,7 @@
   Quad.prototype = {
     draw: function(context) {
       context.save();
-      context.translate(this.x + this.width / 2.0, this.y + this.height / 2.0);
+      context.translate(this.x, this.y);
       context.rotate(this.rotation);
       context.translate(-this.width / 2.0, -this.height / 2.0);
       if(this.colour instanceof Image)
@@ -225,18 +225,19 @@
       context.restore();
     },
     intersectsWith: function(other) {
-      if(this.x + this.width < other.x) return false;
-      if(this.y + this.height < other.y) return false;
-      if(other.x + other.width < this.x) return false;
-      if(other.y + other.height < this.y) return false;
-      return true;
+      var myradius = (this.width + this.height) / 4.0;
+      var oradius = (other.width + other.height) / 4.0;
+      var diffx = this.x - other.x;
+      var diffy =  this.y - other.y;
+      var diff = Math.sqrt(diffx * diffx + diffy * diffy);
+      return (diff < myradius + oradius);
     }
   };
   _.extend(Quad.prototype, Eventable.prototype);
 
   IdGenerator = {
     Next: function(prefix) {
-      return 'prefix' + Math.floor(Math.random() * 10000000);
+      return prefix + Math.floor(Math.random() * 10000000);
     }
   };
 
@@ -247,15 +248,15 @@
     this.id = id;
     this.colour = GlobalResources.getTexture(texture);
     this.height = this.width = (radius * 2.0);
-    this.x = x - radius;
-    this.y = y - radius;
+    this.x = x;
+    this.y = y;
     this.health = this.maxhealth = 100;
-    this.gravity = radius;
+    this.gravity = (radius * 0.5) + 200;
   };
   Planet.prototype = {
     placeOnSurface: function(entity, angle) {
-      var x = (this.x + this.radius) + (this.radius * Math.cos(angle));
-      var y = (this.y + this.radius) + (this.radius * Math.sin(angle));
+      var x = this.x + this.radius * Math.cos(angle);
+      var y = this.y + this.radius * Math.sin(angle);
       entity.x = x;
       entity.y = y - entity.height;
       entity.rotation = angle;
@@ -350,11 +351,12 @@
     notifyCollidedWith: function(other) {
       if(other.id === 'centre')
         other.damage(5);
+      if(other instanceof Asteroid) return;
       this.raise('Destroyed');
     },
     applyGravity: function(amount, x, y) {
-      var diffx = x - this.x;
-      var diffy = y - this.y;
+      var diffx = x - (this.x + this.size/2);
+      var diffy = y - (this.y + this.size/2);
       var distancesq = (diffx * diffx) + (diffy * diffy);
       var adjustedAmount = amount / distancesq;
       this.xvel += diffx * adjustedAmount;
@@ -422,6 +424,9 @@
     tick: function() {
       this.x = this.x + this.xvel;
       this.y = this.y + this.yvel;
+    },
+    notifyCollidedWith: function(other) {
+      this.raise('Destroyed');
     }
   };
   _.extend(Missile.prototype, Quad.prototype);
@@ -437,8 +442,13 @@
       var yvel = Math.sin(angle) * speed;
       var id = IdGenerator.Next('missile-');
       var missile = new Missile(id, x, y, xvel, yvel);
-      this.scene.add(missile);
+      missile.on('Destroyed', this.onMissileDestroyed, this);;
+      this.scene.add(missile);      
     },
+    onMissileDestroyed: function(data, sender) {
+      sender.off('Destroyed', this.onMissileDestroyed, this);
+      this.scene.remove(sender);
+    }
   };
   _.extend(MissileControl.prototype, Eventable.prototype);
 
@@ -549,10 +559,10 @@
       scene.camera.zoomTo(4000);
 
       // For testing purposes
-      scene.add(new Planet('sat1', 'assets/basicplanet.png', 100, -900, 50));
-      scene.add(new Planet('sat2', 'assets/basicplanet.png', 900, 0, 80));
-      scene.add(new Planet('sat3', 'assets/basicplanet.png', 100, 900, 90));
-      scene.add(new Planet('sat4', 'assets/basicplanet.png', -900, 0, 100));
+     // scene.add(new Planet('sat1', 'assets/basicplanet.png', 100, -900, 50));
+     // scene.add(new Planet('sat2', 'assets/basicplanet.png', 900, 0, 80));
+     // scene.add(new Planet('sat3', 'assets/basicplanet.png', 100, 900, 90));
+     // scene.add(new Planet('sat4', 'assets/basicplanet.png', -900, 0, 100));
 
       scene.add(new EnemyFactory());
     },
