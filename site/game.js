@@ -548,6 +548,7 @@
     Eventable.call(this);
     this.standardZoom = standardZoom;
     this.currentZoom = standardZoom;
+    this.desiredZoom = standardZoom;
   };
   CameraController.prototype = {
     onAddedToScene: function(scene) {
@@ -555,14 +556,19 @@
       this.scene.autoHook(this);
     },
     onFired: function() {
-      this.currentZoom += 100;
-      this.scene.camera.zoomTo(this.currentZoom);
+      this.desiredZoom += 100;
     },
     tick: function() {
-      if(this.currentZoom > this.standardZoom) {
-        this.currentZoom -= 6.0;
-        this.scene.camera.zoomTo(this.currentZoom);
-      }
+      if(this.currentZoom > this.desiredZoom)
+        this.currentZoom -= 7.5;
+      else if(this.currentZoom < this.desiredZoom)
+        this.currentZoom += 30;
+      this.scene.camera.zoomTo(this.currentZoom);
+
+      if(this.desiredZoom > this.standardZoom)
+        this.desiredZoom -= 7.5;
+      if(this.desiredZoom < this.standardZoom)
+        this.desiredZoom = this.standardZoom;      
     }
   };
   _.extend(CameraController.prototype, Eventable.prototype);
