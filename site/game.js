@@ -244,17 +244,33 @@
     this.height = 10;
     this.x = 0;
     this.y = -530;
+    this.dirty = true;
   };
   Player.prototype = {
     tick: function() {
-      this.angle += 0.04;
-      this.updateRenderCoords();
+      if(this.dirty)
+        this.updateRenderCoords();
+    },
+    moveLeft: function() {
+      this.angle -= 0.02;
+      this.dirty = true;
+    },
+    moveRight: function() {
+      this.angle += 0.02;
+      this.dirty = true;
+    },
+    fireMissile: function() {
+      var self = this;
+      this.scene.with('missilecontrol', function(missilecontrol) {
+        missilecontrol.fire(self.x, self.y, self.angle, 3.0);
+      });
     },
     updateRenderCoords: function() {
       var self = this;
       this.scene.with('centre', function(planet) {
         planet.placeOnSurface(self, self.angle - (Math.PI / 2));
       });
+      this.dirty = false;
       this.raise('Updated');
     }
   };
@@ -285,6 +301,46 @@
     }
   };
 
+  var Missile = function(id, x, y, xvel, yvel) {
+    Quad.call(this);
+    this.id = id;
+    this.x = x;
+    this.y = y;
+    this.xvel = xvel;
+    this.yvel = yvel;
+    this.colour = '#F00';
+    this.width = 10;
+    this.height = 10;
+  };
+  Missile.prototype = {
+    tick: function() {
+      this.x = this.x + this.xvel;
+      this.y = this.y + this.yvel;
+    }
+  };
+  _.extend(Missile.prototype, Quad.prototype);
+
+  var MissileControl = function() {
+    Eventable.call(this);
+    this.activeMissiles = {};
+    this.id = "missilecontrol";
+  };
+  MissileControl.prototype = {
+    fire: function(x, y, angle, speed) {
+      angle -= (Math.PI/2);
+      var xvel = Math.cos(angle) * speed;
+      var yvel = Math.sin(angle) * speed;
+      var id = 'missile-' + Math.floor(Math.random() * 10000000);
+      var missile = new Missile(id, x, y, xvel, yvel);
+      this.activeMissiles[id] = missile;
+      this.scene.add(missile);
+    },
+    tick: function() {
+      // Check for dead missiles
+    }
+  };
+  _.extend(MissileControl.prototype, Eventable.prototype);
+
   var Controller = function(scene) {
     this.scene = scene;
     this.hookEvents();
@@ -293,11 +349,56 @@
   Controller.prototype = {
     hookEvents: function() {
       this.scene.on('Updated', this.onEntityUpdated, this);
+      
+      var self = this;
+      document.onkeydown = function(e) {
+        self.onKeyDown(e);
+      };   
+      document.onkeyup = function(e) {
+        self.onKeyUp(e);
+      };
 
+    },
+    onKeyDown: function(e) {
+      switch(e.keyCode) {
+        case 37:
+          this.movingLeft = true;
+        break;
+        case 39:
+          this.movingRight = true;
+        break;
+        case 17:
+          this.fireMissile();
+        break;
+      }
+    },
+    onKeyUp: function(e){
+      switch(e.keyCode) {
+        case 37:
+          this.movingLeft = false;
+        break;
+        case 39:
+          this.movingRight = false;
+        break;
+      }
     },
     onEntityUpdated: function(data, sender) {
       if(sender.id !== 'player') return;
       this.scene.camera.rotateTo(-sender.angle);
+    },
+    fireMissile: function() {
+      this.scene.with('player', function(player) {
+        player.fireMissile();
+      });
+    },
+    tick: function() {
+      var self = this;
+      this.scene.with('player', function(player) {
+        if(self.movingLeft)
+          player.moveLeft();
+        else if(self.movingRight)
+          player.moveRight();
+      });
     }
   };
 
@@ -307,6 +408,7 @@
     this.camera = new Camera(this.context);
     this.scene = new Scene(this.camera);
     this.controller = new Controller(this.scene);
+    this.missiles = new MissileControl();
   };
 
   Game.prototype = {
@@ -314,6 +416,7 @@
       var self = this;
       GlobalResources.load('assets.json', function() {
         self.loadMap(new BasicMap())
+        self.scene.add(self.missiles);
         self.createPlayer();
         self.startTimers();
       });
@@ -321,6 +424,7 @@
     startTimers: function() {
       var self = this;
       setInterval(function() {
+        self.controller.tick();
         self.scene.tick();
         self.canvas.width = self.canvas.width;
         self.scene.draw(self.context);
@@ -334,6 +438,8 @@
       this.scene.add(player);
     }
   };
+
+
 
 
   $(document).ready(function() {
