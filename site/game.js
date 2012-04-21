@@ -154,6 +154,7 @@
       this.entitiesIndex.push(entity);
       entity.scene = this;
       entity.onAny(this.onEntityEvent, this);
+      if(entity.onAddedToScene) entity.onAddedToScene(this);
     },
     remove: function(entity) {
       delete this.entities[entity.id];
@@ -441,7 +442,7 @@
       var xvel = Math.cos(angle) * speed;
       var yvel = Math.sin(angle) * speed;
       var id = IdGenerator.Next('missile-');
-      var missile = new Missile(id, x, y, xvel, yvel);
+      var missile = new Missile(id, x + (xvel * 10), y + (yvel * 10), xvel, yvel);
       missile.on('Destroyed', this.onMissileDestroyed, this);;
       this.scene.add(missile);      
     },
@@ -543,10 +544,33 @@
   };
   _.extend(Collision.prototype, Eventable.prototype);
 
+  var CameraController = function(standardZoom) {
+    Eventable.call(this);
+    this.standardZoom = standardZoom;
+    this.currentZoom = standardZoom;
+  };
+  CameraController.prototype = {
+    onAddedToScene: function(scene) {
+      this.scene = scene;
+      this.scene.autoHook(this);
+    },
+    onFired: function() {
+      this.currentZoom += 100;
+      this.scene.camera.zoomTo(this.currentZoom);
+    },
+    tick: function() {
+      if(this.currentZoom > this.standardZoom) {
+        this.currentZoom -= 6.0;
+        this.scene.camera.zoomTo(this.currentZoom);
+      }
+    }
+  };
+  _.extend(CameraController.prototype, Eventable.prototype);
 
   var BasicMap = function() {
 
   };
+
   BasicMap.prototype = {
     loadInto: function(scene) {
 
@@ -556,15 +580,11 @@
 
       // Start off above the polar north of the planet
       scene.camera.moveTo(0, -700);
-      scene.camera.zoomTo(4000);
-
-      // For testing purposes
-     // scene.add(new Planet('sat1', 'assets/basicplanet.png', 100, -900, 50));
-     // scene.add(new Planet('sat2', 'assets/basicplanet.png', 900, 0, 80));
-     // scene.add(new Planet('sat3', 'assets/basicplanet.png', 100, 900, 90));
-     // scene.add(new Planet('sat4', 'assets/basicplanet.png', -900, 0, 100));
-
+      scene.camera.zoomTo(1000);
       scene.add(new EnemyFactory());
+      
+      var controller = new CameraController(1000); 
+      scene.add(controller);
     },
     getSurfaceHeight: function() {
       return 512;
