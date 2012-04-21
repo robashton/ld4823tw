@@ -250,6 +250,7 @@
     this.x = x - radius;
     this.y = y - radius;
     this.health = this.maxhealth = 100;
+    this.gravity = radius;
   };
   Planet.prototype = {
     placeOnSurface: function(entity, angle) {
@@ -265,6 +266,9 @@
     },
     healthPercentage: function() {
       return (this.health / this.maxhealth) * 100;
+    },
+    useGravity: function(other) {
+      other.applyGravity(this.gravity, this.x, this.y);
     }
   };
   _.extend(Planet.prototype, Quad.prototype);
@@ -340,11 +344,21 @@
       this.x += this.xvel;
       this.y += this.yvel;
       this.rotation += 0.01;
+      this.xvel *= 0.68;
+      this.yvel *= 0.68;
     },
     notifyCollidedWith: function(other) {
       if(other.id === 'centre')
         other.damage(5);
       this.raise('Destroyed');
+    },
+    applyGravity: function(amount, x, y) {
+      var diffx = x - this.x;
+      var diffy = y - this.y;
+      var distancesq = (diffx * diffx) + (diffy * diffy);
+      var adjustedAmount = amount / distancesq;
+      this.xvel += diffx * adjustedAmount;
+      this.yvel += diffy * adjustedAmount;
     }
   };
   _.extend(Asteroid.prototype, Quad.prototype);
@@ -496,11 +510,14 @@
   Collision.prototype = {
     tick: function() {
       var self = this;
-      this.scene.crossEach(self.evaluate);
+      this.scene.crossEach(function(one, two) {
+        self.evaluate(one, two);
+      });
     },
     evaluate: function(one, two) {
       this.evaluateCollision(one, two);
       this.evaluateGravity(one, two);
+      this.evaluateGravity(two, one);
     },
     evaluateCollision: function(one, two) {
       if(!one.physical || !two.physical) return;
@@ -509,8 +526,9 @@
         if(two.notifyCollidedWith) two.notifyCollidedWith(one);
       }
     },
-    evaluateGravity: function() {
-      
+    evaluateGravity: function(one, two) {
+      if(one.useGravity && two.applyGravity)
+        one.useGravity(two);
     }
   };
   _.extend(Collision.prototype, Eventable.prototype);
