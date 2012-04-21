@@ -228,7 +228,7 @@
     this.height = this.width = (radius * 2.0);
     this.x = x - radius;
     this.y = y - radius;
-
+    this.health = this.maxhealth = 100;
   };
   Planet.prototype = {
     placeOnSurface: function(entity, angle) {
@@ -237,6 +237,13 @@
       entity.x = x;
       entity.y = y - entity.height;
       entity.rotation = angle;
+    },
+    damage: function(amount) {
+      this.health--;
+      this.raise('Damaged')
+    },
+    healthPercentage: function() {
+      return (this.health / this.maxhealth) * 100;
     }
   };
   _.extend(Planet.prototype, Quad.prototype);
@@ -251,11 +258,17 @@
     this.x = 0;
     this.y = -530;
     this.dirty = true;
+    this.energy = this.maxenergy = 100;
+    this.energyincreaserate = 0.05;
   };
   Player.prototype = {
     tick: function() {
       if(this.dirty)
         this.updateRenderCoords();
+      if(this.energy < this.maxenergy) {
+        this.energy += this.energyincreaserate;
+        this.raise('EnergyIncreased');
+      }
     },
     moveLeft: function() {
       this.angle -= 0.02;
@@ -267,9 +280,12 @@
     },
     fireMissile: function() {
       var self = this;
+      if(this.energy <= 0) return;
       this.scene.with('missilecontrol', function(missilecontrol) {
         missilecontrol.fire(self.x, self.y, self.angle, 3.0);
       });
+      self.energy -= 2.0;
+      self.raise('Fired');
     },
     updateRenderCoords: function() {
       var self = this;
@@ -278,6 +294,9 @@
       });
       this.dirty = false;
       this.raise('Updated');
+    },
+    energyPercentage: function() {
+      return (this.energy / this.maxenergy) * 100;
     }
   };
   _.extend(Player.prototype, Quad.prototype);
@@ -297,6 +316,7 @@
     tick: function() {
       this.x += this.xvel;
       this.y += this.yvel;
+      this.rotation += 0.01;
     }
   };
   _.extend(Asteroid.prototype, Quad.prototype);
@@ -442,7 +462,7 @@
 
       // Start off above the polar north of the planet
       scene.camera.moveTo(0, -700);
-      scene.camera.zoomTo(2000);
+      scene.camera.zoomTo(1000);
 
       // For testing purposes
       scene.add(new Planet('sat1', 'assets/basicplanet.png', 100, -900, 50));
@@ -457,6 +477,31 @@
     }
   };
 
+
+  var Hud = function(scene) {
+    this.scene = scene;
+    this.scene.autoHook(this);
+    this.health = $('#health');
+    this.energy = $('#energy');
+  };
+  Hud.prototype = {
+    onDamaged: function(data, sender) {
+      if(sender.id !== 'centre') return;      
+      var perc = sender.healthPercentage();
+      this.health.css('width', perc + '%');
+    },
+    onFired: function(data, sender) {
+      if(sender.id !== 'player') return;
+      var perc = sender.energyPercentage();
+      this.energy.css('width', perc + '%');
+    },
+    onEnergyIncreased: function(data, sender) {
+      if(sender.id !== 'player') return;
+      var perc = sender.energyPercentage();
+      this.energy.css('width', perc + '%');
+    }
+  };
+
   var Game = function() {
     this.canvas = document.getElementById('target');
     this.context = this.canvas.getContext('2d');
@@ -464,6 +509,7 @@
     this.scene = new Scene(this.camera);
     this.controller = new Controller(this.scene);
     this.missiles = new MissileControl();
+    this.hud = new Hud(this.scene);
   };
 
   Game.prototype = {
@@ -493,9 +539,6 @@
       this.scene.add(player);
     }
   };
-
-
-
 
   $(document).ready(function() {
     var game = new Game();

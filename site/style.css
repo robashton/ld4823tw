@@ -4,4 +4,49 @@ body {
 
 #target {
   border: 1px solid #555;
+  width: 100%;
+  height: 75%;
+}
+
+#amounts {
+  width: 100%;
+  background-color: #000;
+  color: #EEE;
+  font-size: 18px;
+  height: 60px;
+  border: 1px solid #000;
+}
+
+#amounts span {
+  clear: left;
+  width: 15%;
+  float: left;
+  text-align: right;
+  margin-top: 5px;
+}
+
+#amounts div {
+  width: 75%;
+  float: left;
+}
+
+#amounts div div {
+  border: 1px solid #222;
+  height: 20px;
+  margin-top: 5px;
+  margin-left: 10px;
+  width: 100%;
+}
+
+#health {
+  background-color: #0A0;
+}
+
+#energy {
+  background-color: #CC0;
+}
+
+.break {
+  clear: both;
+  float: none;
 }
