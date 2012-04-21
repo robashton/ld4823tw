@@ -145,16 +145,19 @@
     Eventable.call(this);
     this.camera = camera;
     this.entities = {};
+    this.entitiesIndex = [];
   };
 
   Scene.prototype = {
     add: function(entity) {
       this.entities[entity.id] = entity;
+      this.entitiesIndex.push(entity);
       entity.scene = this;
       entity.onAny(this.onEntityEvent, this);
     },
     remove: function(entity) {
       delete this.entities[entity.id];
+      this.entitiesIndex = _(this.entitiesIndex).without(entity);
       entity.scene = null;
       entity.offAny(this.onEntityEvent, this);
     },
@@ -182,6 +185,15 @@
         cb(entity);
       }
     },
+    crossEach: function(cb) {
+      for(var i = 0; i < this.entitiesIndex.length; i++) {
+        for(var j = i+1 ; j < this.entitiesIndex.length; j++) {
+          var one = this.entitiesIndex[i];
+          var two = this.entitiesIndex[j];
+          cb(one, two);
+        }
+      }
+    },
     onEntityEvent: function(e, sender) {
       this.raise(e.event, e.data, sender);
     }
@@ -196,6 +208,7 @@
     this.width = 4;
     this.height = 4;
     this.rotation = 0;
+    this.physical = false;
   };
   Quad.prototype = {
     draw: function(context) {
@@ -210,6 +223,13 @@
         context.fillRect(0, 0, this.width, this.height);
       }
       context.restore();
+    },
+    intersectsWith: function(other) {
+      if(this.x + this.width < other.x) return false;
+      if(this.y + this.height < other.y) return false;
+      if(other.x + other.width < this.x) return false;
+      if(other.y + other.height < this.y) return false;
+      return true;
     }
   };
   _.extend(Quad.prototype, Eventable.prototype);
@@ -222,6 +242,7 @@
 
   var Planet = function(id, texture, x, y, radius) {
     Quad.call(this);
+    this.physical = true;
     this.radius = radius;
     this.id = id;
     this.colour = GlobalResources.getTexture(texture);
@@ -303,9 +324,11 @@
 
   var Asteroid = function(id, size, x, y, xvel, yvel) {
     Quad.call(this);
+    this.physical = true;
     this.id = id;
     this.x = x;
     this.y = y;
+    this.size = size;
     this.xvel = xvel;
     this.yvel = yvel;
     this.width = size;
@@ -317,6 +340,11 @@
       this.x += this.xvel;
       this.y += this.yvel;
       this.rotation += 0.01;
+    },
+    notifyCollidedWith: function(other) {
+      if(other.id === 'centre')
+        other.damage(5);
+      this.raise('Destroyed');
     }
   };
   _.extend(Asteroid.prototype, Quad.prototype);
@@ -333,24 +361,40 @@
         this.emit();
     },
     emit: function() {
-      var id = IdGenerator.Next('asteroid-');
       var angle = Math.random() * (Math.PI * 2);
-      var size = 40 + Math.random() * 50;
       var xdir = Math.cos(angle);
       var ydir = Math.sin(angle);
       var x = 1500 * xdir;
       var y = 1500 * ydir;
-      var speed = 1.0 + Math.random() * 2.0;
-      var xvel = speed * (-xdir);
-      var yvel = speed * (-ydir);
+      var size = 40 + Math.random() * 50;
+      this.emitAt(x, y, size);
+    },
+    emitAt: function(x, y, size) {
+      var speed = 2.0 + Math.random() * 3.0;
+      var id = IdGenerator.Next('asteroid-');
+      var xvel = speed * (1.0 - (Math.random() * 2.0));
+      var yvel = speed * (1.0 - (Math.random() * 2.0));
       var asteroid = new Asteroid(id, size, x, y, xvel, yvel);
       this.scene.add(asteroid);
+      asteroid.on('Destroyed', this.onAsteroidDestroyed, this);
+    },
+    onAsteroidDestroyed: function(data, sender) {
+      this.scene.remove(sender);
+      sender.off('Destroyed', this.onAsteroidDestroyed, this);
+      this.determineAsteroidForking(sender);
+    },
+    determineAsteroidForking: function(asteroid) {
+      if(asteroid.size > 70) {
+        this.emitAt(asteroid.x, asteroid.y, asteroid.size / 2);
+        this.emitAt(asteroid.x, asteroid.y, asteroid.size / 2);
+      }
     }
   };
   _.extend(EnemyFactory.prototype, Eventable.prototype);
 
   var Missile = function(id, x, y, xvel, yvel) {
     Quad.call(this);
+    this.physical = true;
     this.id = id;
     this.x = x;
     this.y = y;
@@ -370,7 +414,6 @@
 
   var MissileControl = function() {
     Eventable.call(this);
-    this.activeMissiles = {};
     this.id = "missilecontrol";
   };
   MissileControl.prototype = {
@@ -380,12 +423,8 @@
       var yvel = Math.sin(angle) * speed;
       var id = IdGenerator.Next('missile-');
       var missile = new Missile(id, x, y, xvel, yvel);
-      this.activeMissiles[id] = missile;
       this.scene.add(missile);
     },
-    tick: function() {
-      // Check for dead missiles
-    }
   };
   _.extend(MissileControl.prototype, Eventable.prototype);
 
@@ -397,7 +436,7 @@
   Controller.prototype = {
     hookEvents: function() {
       this.scene.on('Updated', this.onEntityUpdated, this);
-      
+        
       var self = this;
       document.onkeydown = function(e) {
         self.onKeyDown(e);
@@ -450,6 +489,33 @@
     }
   };
 
+  var Collision = function() {
+    Eventable.call(this);
+    this.id = "collision";
+  };
+  Collision.prototype = {
+    tick: function() {
+      var self = this;
+      this.scene.crossEach(self.evaluate);
+    },
+    evaluate: function(one, two) {
+      this.evaluateCollision(one, two);
+      this.evaluateGravity(one, two);
+    },
+    evaluateCollision: function(one, two) {
+      if(!one.physical || !two.physical) return;
+      if(one.intersectsWith(two)) {
+        if(one.notifyCollidedWith) one.notifyCollidedWith(two);
+        if(two.notifyCollidedWith) two.notifyCollidedWith(one);
+      }
+    },
+    evaluateGravity: function() {
+      
+    }
+  };
+  _.extend(Collision.prototype, Eventable.prototype);
+
+
   var BasicMap = function() {
 
   };
@@ -462,7 +528,7 @@
 
       // Start off above the polar north of the planet
       scene.camera.moveTo(0, -700);
-      scene.camera.zoomTo(1000);
+      scene.camera.zoomTo(4000);
 
       // For testing purposes
       scene.add(new Planet('sat1', 'assets/basicplanet.png', 100, -900, 50));
@@ -476,7 +542,6 @@
       return 512;
     }
   };
-
 
   var Hud = function(scene) {
     this.scene = scene;
@@ -510,6 +575,7 @@
     this.controller = new Controller(this.scene);
     this.missiles = new MissileControl();
     this.hud = new Hud(this.scene);
+    this.collision = new Collision();
   };
 
   Game.prototype = {
@@ -518,6 +584,7 @@
       GlobalResources.load('assets.json', function() {
         self.loadMap(new BasicMap())
         self.scene.add(self.missiles);
+        self.scene.add(self.collision);
         self.createPlayer();
         self.startTimers();
       });
