@@ -2,6 +2,7 @@
   "name": "ld48-23",
   "version": "1.0.0",
   "dependencies": {
-    "paperboy": ""
+    "paperboy": "",
+    "swallow": ""
   }
 }
