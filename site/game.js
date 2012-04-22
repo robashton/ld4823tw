@@ -283,7 +283,7 @@
       var x = this.x + (this.radius + height) * Math.cos(angle);
       var y = this.y + (this.radius + height) * Math.sin(angle);
       entity.x = x;
-      entity.y = y - entity.height;
+      entity.y = y - (entity.height / 2.0);
       entity.rotation = angle + (Math.PI / 2);
     },
     damage: function(amount) {
@@ -939,10 +939,14 @@
         this.currentZoom += 30;
       this.scene.camera.zoomTo(this.currentZoom);
 
+      if(Math.abs(this.desiredZoom - this.currentZoom) < 15)
+        this.currentZoom = this.desiredZoom;
+
       if(this.desiredZoom > this.standardZoom)
         this.desiredZoom -= 15;
       if(this.desiredZoom < this.standardZoom)
-        this.desiredZoom = this.standardZoom;      
+        this.desiredZoom = this.standardZoom;    
+
     }
   };
   _.extend(CameraController.prototype, Eventable.prototype);
@@ -1080,26 +1084,26 @@
       this.planet.on('Destroyed', this.onPlanetDestroyed, this);
 
       // Start off above the polar north of the planet
-      scene.camera.moveTo(0, -100);
-      scene.camera.zoomTo(500);
+      scene.camera.moveTo(0, 0);
+      scene.camera.zoomTo(1000);
       scene.add(new EnemyFactory());
       var bastard = new Bastard();
       scene.add(bastard);
 
-      scene.add(new Message(-80, -200, "3", 30, '#F00'));
+      scene.add(new Message(-200, -100, "3", 30, '#F00'));
 
       setTimeout(function() {
-        scene.add(new Message(-80, -200, "2", 30, '#F00'));
+        scene.add(new Message(-200, -100, "2", 30, '#F00'));
       }, 1000);
 
       setTimeout(function() {
-        scene.add(new Message(-80, -200, "1", 30, '#F00'));
+        scene.add(new Message(-200, -100, "1", 30, '#F00'));
       }, 2000);
      
       setTimeout(function() {
-        var controller = new CameraController(500, 2000); 
+        var controller = new CameraController(1000, 2000); 
         scene.add(controller);
-        scene.add(new Message(-80, -200, "GO GO GO", 90, '#F00'));
+        scene.add(new Message(-200, -100, "GO GO GO", 90, '#F00'));
       }, 3000)
     },
     getSurfaceHeight: function() {
