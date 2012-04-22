@@ -301,11 +301,11 @@
       }
     },
     moveLeft: function() {
-      this.angle -= 0.02;
+      this.angle -= 0.04;
       this.dirty = true;
     },
     moveRight: function() {
-      this.angle += 0.02;
+      this.angle += 0.04;
       this.dirty = true;
     },
     fireMissile: function() {
