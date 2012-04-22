@@ -16,16 +16,16 @@ TODO: Sunday
 - Scoring                                                                       [x]
 - Add game over screen with score                                               [x]
 - Place player in low orbit rather than on earth                                [x]
-- Gets harder as you go on
-- Better graphics
-- Sounds
+- Gets harder as you go on							[x]
+- Better graphics								[x]
+- Sounds									[x]
 
 
 -----------
 - IMPORTANT
 -----------
 
-- Drink some wine
+- Drink some wine								[x]
 - Drink some beer
 - Eat some MEAT                                                                 [x]
 
@@ -33,11 +33,11 @@ TODO: Sunday
 - OPTIONAL
 ----------
 
-- Particles
-- Explosions
+- Particles									[x]
+- Explosions									[x]
 - Power-ups
-  - Health++;
-  - Energy++;
+  - Health++;									[x]
+  - Energy++;									[x]
   - Scatter gun     (Lasts for N seconds)
-  - Homing missiles (Lasts for N seconds)
-  - Repel Field     (Pushes back all current asteroids as soon as picked up)
+  - Homing missiles (Lasts for N seconds)					
+  - Repel Field     (Pushes back all current asteroids as soon as picked up)	[x]
