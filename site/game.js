@@ -201,15 +201,30 @@
   };
   _.extend(Scene.prototype, Eventable.prototype);
 
-  var RenderQuad = function() {
+  var Quad = function() {
     Eventable.call(this);
-    this.colour = '#FFF';
     this.x = -2;
     this.y = -2;
     this.width = 4;
     this.height = 4;
     this.rotation = 0;
     this.physical = false;
+  };
+  Quad.prototype = {
+    intersectsWith: function(other) {
+      var myradius = (this.width + this.height) / 4.0;
+      var oradius = (other.width + other.height) / 4.0;
+      var diffx = this.x - other.x;
+      var diffy =  this.y - other.y;
+      var diff = Math.sqrt(diffx * diffx + diffy * diffy);
+      return (diff < myradius + oradius);
+    }
+  };
+  _.extend(Quad.prototype, Eventable.prototype);
+
+  var RenderQuad = function() {
+    Quad.call(this);
+    this.colour = '#FFF';
   };
   RenderQuad.prototype = {
     draw: function(context) {
@@ -224,17 +239,9 @@
         context.fillRect(0, 0, this.width, this.height);
       }
       context.restore();
-    },
-    intersectsWith: function(other) {
-      var myradius = (this.width + this.height) / 4.0;
-      var oradius = (other.width + other.height) / 4.0;
-      var diffx = this.x - other.x;
-      var diffy =  this.y - other.y;
-      var diff = Math.sqrt(diffx * diffx + diffy * diffy);
-      return (diff < myradius + oradius);
     }
   };
-  _.extend(RenderQuad.prototype, Eventable.prototype);
+  _.extend(RenderQuad.prototype, Quad.prototype);
 
   IdGenerator = {
     Next: function(prefix) {
@@ -251,23 +258,33 @@
     this.height = this.width = (radius * 2.0);
     this.x = x;
     this.y = y;
-    this.health = this.maxhealth = 100;
+    this.health = this.maxhealth = 1000;
     this.gravity = radius;
   };
   Planet.prototype = {
+    onAddedToScene: function() {
+      this.scene.on('LevelChanged', this.onLevelChanged, this);
+    },
+    onLevelChanged: function(level) {
+      this.gravity = this.radius * (level * 2.0);
+    },
     placeOnSurface: function(entity, angle, height) {
       height = height || 0;
       var x = this.x + (this.radius + height) * Math.cos(angle);
       var y = this.y + (this.radius + height) * Math.sin(angle);
       entity.x = x;
       entity.y = y - entity.height;
-      entity.rotation = angle;
+      entity.rotation = angle + (Math.PI / 2);
     },
     damage: function(amount) {
-      this.health -= amount * 10;
+      this.health -= amount;
       this.raise('Damaged')
       if(this.health <= 0)
         this.raise('Destroyed');
+    },
+    tick: function() {
+      if(this.health < this.maxhealth)
+        this.health += 0.01;
     },
     healthPercentage: function() {
       return (this.health / this.maxhealth) * 100;
@@ -282,16 +299,23 @@
     RenderQuad.call(this);
     this.id = 'player';
     this.angle = 0;
-    this.colour = '#FFF';
-    this.width = 20;
-    this.height = 10;
+    this.colour = GlobalResources.getTexture('assets/ship.png');
+    this.width = 10;
+    this.height = 20;
     this.x = 0;
     this.y = -530;
     this.dirty = true;
     this.energy = this.maxenergy = 100;
     this.energyincreaserate = 0.05;
+    this.speed = 0.04;
   };
   Player.prototype = {
+    onAddedToScene: function() {
+      this.scene.on('LevelChanged', this.onLevelChanged, this);
+    },
+    onLevelChanged: function(level) {
+      this.speed = 0.04 + (0.0025 * level);
+    },
     tick: function() {
       if(this.dirty)
         this.updateRenderCoords();
@@ -301,11 +325,11 @@
       }
     },
     moveLeft: function() {
-      this.angle -= 0.04;
+      this.angle -= this.speed;
       this.dirty = true;
     },
     moveRight: function() {
-      this.angle += 0.04;
+      this.angle += this.speed;
       this.dirty = true;
     },
     fireMissile: function() {
@@ -351,8 +375,10 @@
       this.rotation += 0.1;
     },
     notifyCollidedWith: function(other) {
-      if(other.id === 'centre')
+      if(other.id === 'centre') {
+        this.scene.add(new Message(this.x, this.y, -10, 30, '#F00'));
         other.damage(10);
+      }
       if(other instanceof Asteroid) return;
       this.raise('Destroyed');
     },
@@ -375,8 +401,18 @@
     this.id = "enemyfactory";
     this.rate = 90;
     this.ticks = 0;
+    this.level = 1;
+    this.speedseed = 1.0;
   };
   EnemyFactory.prototype = {
+    onAddedToScene: function() {
+      this.scene.on('LevelChanged', this.onLevelChanged, this);
+    },
+    onLevelChanged: function(level) {
+      this.level = level;
+      this.rate = Math.max(90 - (level * 10), 30);
+      this.speedseed = 1.0 + (level * 0.05);
+    },
     tick: function() {
       if(++this.ticks % this.rate === 0)
         this.emit();
@@ -388,7 +424,7 @@
       var x = 1500 * xdir;
       var y = 1500 * ydir;
 
-      var speed = 1.0 + Math.random() * 1.0;
+      var speed = 1.0 + Math.random() * this.speedseed;
       var accuracy = 1.0 - Math.random() * 2.0;
       var xvel = speed * ((-xdir) + accuracy);
       var yvel = speed * ((-ydir) - accuracy);
@@ -419,18 +455,28 @@
   _.extend(EnemyFactory.prototype, Eventable.prototype);
 
   var Missile = function(id, x, y, xvel, yvel) {
-    RenderQuad.call(this);
+    Quad.call(this);
     this.physical = true;
     this.id = id;
     this.x = x;
     this.y = y;
     this.xvel = xvel;
     this.yvel = yvel;
-    this.colour = '#F00';
     this.width = 10;
     this.height = 10;
   };
   Missile.prototype = {
+    draw: function(context) {
+      context.beginPath();
+      var gradient = context.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.width);
+      gradient.addColorStop(0, "white");
+      gradient.addColorStop(0.4, "white");
+      gradient.addColorStop(0.4, '#0DD');
+      gradient.addColorStop(1, "black");
+      context.fillStyle = gradient;
+      context.arc(this.x, this.y, this.width, Math.PI * 2, false);
+      context.fill();
+    },
     tick: function() {
       this.x = this.x + this.xvel;
       this.y = this.y + this.yvel;
@@ -440,10 +486,10 @@
         var points = other.getPoints();
         this.raise('PointsGained', points);
       }
-      this.raise('Destroyed');
+      this.raise('Destroyed');    
     }
   };
-  _.extend(Missile.prototype, RenderQuad.prototype);
+  _.extend(Missile.prototype, Quad.prototype);
 
   var MissileControl = function() {
     Eventable.call(this);
@@ -566,7 +612,13 @@
         this.particles.push(new Particle(this.x, this.y, velx, vely, size, colour));
       }
     },
-    draw: function(context) { 
+    tick: function() {
+      var self = this;
+      this.scene.with('explosionoverlay', function(overlay) {
+        overlay.register(self);
+      });
+    },
+    fill: function(context) { 
       if(this.ticks++ > this.lifetime)
         return this.finished();   
       context.save();
@@ -628,11 +680,11 @@
   };
   _.extend(Collision.prototype, Eventable.prototype);
 
-  var CameraController = function(standardZoom) {
+  var CameraController = function(startZoom, standardZoom) {
     Eventable.call(this);
     this.id = "cameracontroller";
     this.standardZoom = standardZoom;
-    this.currentZoom = standardZoom;
+    this.currentZoom = startZoom;
     this.desiredZoom = standardZoom;
   };
   CameraController.prototype = {
@@ -668,11 +720,110 @@
       this.scene.autoHook(this);
     },
     onPointsGained: function(points, sender) {
-      this.score += points * this.level;
+      points *= this.level;
+      this.score += points;
       this.raise('ScoreChanged', this.score);
+      this.scene.add(new Message(sender.x, sender.y, points, 30, '#F00'));
+    },
+    onLevelChanged: function(level) {
+      this.level = level;
     }
   };
   _.extend(ScoreKeeper.prototype, Eventable.prototype);
+
+  var Message = function(x, y, message, duration, colour) {
+    Eventable.call(this);
+    this.id = IdGenerator.Next('message-');
+    this.ticks = 0;
+    this.duration = duration;
+    this.message = message;
+    this.colour = colour;
+    this.x = x;
+    this.y = y;
+  };
+  Message.prototype = {
+    tick: function() {
+      var self = this;
+      this.scene.with('textoverlay', function(overlay) {
+        overlay.register(self);
+      })
+    },
+    fill: function(context) {
+      context.fillStyle = this.colour;
+      context.font = "24pt Helvetica";
+      context.fillText(this.message, this.x, this.y);
+      if(this.ticks++ >= this.duration)
+        this.scene.remove(this);
+    }
+  };
+  _.extend(Message.prototype, Eventable.prototype);
+
+  var Bastard = function() {
+    Eventable.call(this);
+    this.id = "bastard";
+    this.level = 1;
+    this.score = 0;
+    this.threshold = 500;
+  };
+  Bastard.prototype = {
+    onAddedToScene: function() {
+      this.scene.autoHook(this);
+    },
+    onScoreChanged: function(score) {
+      this.score = score;
+      if(this.score > this.threshold)
+        this.nextLevel();
+    },
+    changeLevel: function(level) {
+      this.level = level;
+      this.update();
+    },
+    nextLevel: function() {
+      this.level++;
+      this.update();
+    },
+    update: function() {
+      this.threshold = this.level * 500;
+      this.raise('LevelChanged', this.level);
+    }
+  };
+  _.extend(Bastard.prototype, Eventable.prototype);
+
+  var TextOverlay = function() {
+    Eventable.call(this);
+    this.messages = [];
+    this.id = "textoverlay";
+  };
+  TextOverlay.prototype = {
+    register: function(msg) {
+      this.messages.push(msg);
+    },
+    draw: function(context) {
+      for(var i in this.messages) {
+        this.messages[i].fill(context);
+      }
+      this.messages = [];
+    }
+  };
+  _.extend(TextOverlay.prototype, Eventable.prototype);
+
+  var ExplosionOverlay = function() {
+    Eventable.call(this);
+    this.explosions = [];
+    this.id = "explosionoverlay";
+  };
+  ExplosionOverlay.prototype = {
+    register: function(explosion) {
+      this.explosions.push(explosion);
+    },
+    draw: function(context) {
+      for(var i in this.explosions) {
+        this.explosions[i].fill(context);
+      }
+      this.explosions = [];
+    }
+  };
+  _.extend(ExplosionOverlay.prototype, Eventable.prototype);
 
   var BasicMap = function() {
     Eventable.call(this);
@@ -684,18 +835,35 @@
     loadInto: function(scene) {
       this.scene = scene;
       // Create the planet we're protecting
-      this.planet = new Planet('centre', 'assets/basicplanet.png', 0, 0, 128);
+      this.planet = new Planet('centre', 'assets/largeplanet.png', 0, 0, 128);
       scene.add(this.planet);
 
       this.planet.on('Destroyed', this.onPlanetDestroyed, this);
 
       // Start off above the polar north of the planet
       scene.camera.moveTo(0, -100);
-      scene.camera.zoomTo(100);
+      scene.camera.zoomTo(500);
       scene.add(new EnemyFactory());
-      
-      var controller = new CameraController(2000); 
-      scene.add(controller);
+      var bastard = new Bastard();
+      scene.add(bastard);
+
+
+      scene.add(new Message(-80, -200, "3", 30, '#F00'));
+
+      setTimeout(function() {
+        scene.add(new Message(-80, -200, "2", 30, '#F00'));
+      },1000);
+
+      setTimeout(function() {
+        scene.add(new Message(-80, -200, "1", 30, '#F00'));
+      },2000);
+     
+      setTimeout(function() {
+        var controller = new CameraController(500, 2000); 
+        scene.add(controller);
+        scene.add(new Message(-80, -200, "GO GO GO", 90, '#F00'));
+              bastard.changeLevel(10);
+      }, 3000)
     },
     getSurfaceHeight: function() {
       return 512;
@@ -715,6 +883,7 @@
     this.score = $('#score');
     this.health = $('#health');
     this.energy = $('#energy');
+    this.level = $('#level');
   };
   Hud.prototype = {
     onDamaged: function(data, sender) {
@@ -734,6 +903,9 @@
     },
     onScoreChanged: function(score, sender) {
       this.score.text(score);
+    },
+    onLevelChanged: function(level, sender) {
+      this.level.text(level);
     }
   };
 
@@ -747,16 +919,20 @@
     this.hud = new Hud(this.scene);
     this.collision = new Collision();
     this.scorekeeper = new ScoreKeeper();
+    this.explosionoverlay = new ExplosionOverlay();
+    this.textoverlay = new TextOverlay();
   };
 
   Game.prototype = {
     start: function() {
       var self = this;
       GlobalResources.load('assets.json', function() {
-        self.loadMap(new BasicMap())
         self.scene.add(self.missiles);
         self.scene.add(self.collision);
         self.scene.add(self.scorekeeper);
+        self.scene.add(self.explosionoverlay);
+        self.scene.add(self.textoverlay);
+        self.loadMap(new BasicMap())
         self.createPlayer();
         self.startTimers();
       });

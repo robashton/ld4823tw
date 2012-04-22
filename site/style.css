@@ -8,16 +8,19 @@ body {
   height: 75%;
 }
 
-#amounts, #score-container {
+#amounts, .info-container {
   width: 100%;
   background-color: #000;
   color: #EEE;
   font-size: 18px;
-  height: 60px;
   border: 1px solid #000;
 }
 
-#amounts span, #score-container span {
+#amounts {
+  height: 60px;
+}
+
+#amounts span, .info-container span {
   clear: left;
   width: 15%;
   float: left;
@@ -25,7 +28,7 @@ body {
   margin-top: 5px;
 }
 
-#amounts div, #score-container div {
+#amounts div, .info-container div {
   width: 75%;
   float: left;
 }
@@ -38,9 +41,8 @@ body {
   width: 100%;
 }
 
-#score {
+.info-container div {
   font-size: 18px;
-  height: 60px;
   margin-top: 5px;
   margin-left: 10px;
 }
