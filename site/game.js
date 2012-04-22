@@ -407,7 +407,12 @@
       this.createAsteroidExplosion(sender.x, sender.y);
     },
     createAsteroidExplosion: function(x, y) {
-      var explosion = new Explosion(IdGenerator.Next('explosion-'), x, y);
+      var explosion = new Explosion(IdGenerator.Next('explosion-'), x, y, {
+        r: 1.0,
+        g: 0.5,
+        b: 0.01 ,
+        lifetime: 120       
+      });
       this.scene.add(explosion);
     }
   };
@@ -543,6 +548,9 @@
     this.ticks = 0;
     this.x = x;
     this.y = y;
+    this.r = cfg.r || 1.0;
+    this.g = cfg.g || 1.0;
+    this.b = cfg.b || 1.0;
     this.initParticles();
   };
   Explosion.prototype = {
@@ -550,14 +558,19 @@
       for(var i = 0 ; i < this.amount ; i++) {
         var velx = 1.0 - Math.random() * 2.0;
         var vely = 1.0 - Math.random() * 2.0;
-        var size = 5.0 + Math.random() * 5.0;
-        var colour = '#F00';
+        var size = 10.0 + Math.random() * 10.0;
+        var r = Math.random() * (this.r * 255) >> 0;
+        var g = Math.random() * (this.g * 255) >> 0;
+        var b = Math.random() * (this.b * 255) >> 0;
+        var colour = "rgba("+r+","+g+","+b+",0.5)";
         this.particles.push(new Particle(this.x, this.y, velx, vely, size, colour));
       }
     },
     draw: function(context) { 
       if(this.ticks++ > this.lifetime)
         return this.finished();   
+      context.save();
+      context.globalAlpha = Math.max(1.0 - (this.ticks / this.lifetime, 0.0));
       for(var i = 0; i < this.amount ; i++) {
         var particle = this.particles[i];
         this.updateParticle(particle);
@@ -572,6 +585,7 @@
         context.arc(particle.x, particle.y, particle.size, Math.PI * 2, false);
         context.fill();
       }
+      context.restore();
     },
     finished: function() {
       this.raise('Finished');
