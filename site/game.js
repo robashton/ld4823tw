@@ -258,7 +258,7 @@
     this.height = this.width = (radius * 2.0);
     this.x = x;
     this.y = y;
-    this.health = this.maxhealth = 1000;
+    this.health = this.maxhealth = 100;
     this.gravity = radius;
   };
   Planet.prototype = {
@@ -283,8 +283,14 @@
         this.raise('Destroyed');
     },
     tick: function() {
-      if(this.health < this.maxhealth)
+      if(this.health < this.maxhealth) {
         this.health += 0.01;
+        this.raise('Healed', this.health);
+      }
+    },
+    increaseHealth: function(amount) {
+      this.health = Math.min(amount + this.health, this.maxhealth);
+      this.raise('Healed', this.health);
     },
     healthPercentage: function() {
       return (this.health / this.maxhealth) * 100;
@@ -308,6 +314,9 @@
     this.energy = this.maxenergy = 100;
     this.energyincreaserate = 0.05;
     this.speed = 0.04;
+    this.firingrate = 10;
+    this.ticks = 0;
+    this.energyFreeze = 0;
   };
   Player.prototype = {
     onAddedToScene: function() {
@@ -315,6 +324,7 @@
     },
     onLevelChanged: function(level) {
       this.speed = 0.04 + (0.0025 * level);
+      this.firingrate = Math.max(10 - Math.floor(level * 0.5), 5);
     },
     tick: function() {
       if(this.dirty)
@@ -322,6 +332,11 @@
       if(this.energy < this.maxenergy) {
         this.energy += this.energyincreaserate;
         this.raise('EnergyIncreased');
+      }
+      if(this.ticks !== 0) {
+        if(this.ticks++ >= this.firingrate) {
+          this.ticks = 0;
+        }
       }
     },
     moveLeft: function() {
@@ -336,13 +351,26 @@
       this.energy = Math.min(this.energy + amount, this.maxenergy);
       this.raise('EnergyIncreased');
     },
+    freezeEnergy: function(duration) {
+      this.energyFreeze = duration;
+      this.raise('EnergyFreezeStart');
+    },
     fireMissile: function() {
       var self = this;
       if(this.energy <= 0) return;
+      if(this.ticks++ !== 0) return;
+
       this.scene.with('missilecontrol', function(missilecontrol) {
         missilecontrol.fire(self.x, self.y, self.angle, 5.0);
       });
-      self.energy -= 2.0;
+
+      if(this.energyFreeze > 0) {
+        this.energyFreeze--;
+        if(this.energyFreeze <= 0)
+          this.raise('EnergyFreezeEnd');
+      } else {
+        self.energy -= 2.0;
+      } 
       self.raise('Fired');
     },
     updateRenderCoords: function() {
@@ -359,8 +387,24 @@
   };
   _.extend(Player.prototype, RenderQuad.prototype);
 
+  var HasMass = function() {
+
+  };
+  HasMass.prototype = {
+    applyGravity: function(amount, x, y) {
+      var diffx = x - (this.x + this.size/2);
+      var diffy = y - (this.y + this.size/2);
+      var distancesq = (diffx * diffx) + (diffy * diffy);
+      var adjustedAmount = (amount / distancesq) * 0.01;
+      this.xvel += diffx * adjustedAmount;
+      this.yvel += diffy * adjustedAmount;
+    },
+  };
+
+
   var Asteroid = function(id, size, x, y, xvel, yvel) {
     RenderQuad.call(this);
+    HasMass.call(this);
     this.physical = true;
     this.id = id;
     this.x = x;
@@ -386,19 +430,14 @@
       if(other instanceof Asteroid) return;
       this.raise('Destroyed');
     },
-    applyGravity: function(amount, x, y) {
-      var diffx = x - (this.x + this.size/2);
-      var diffy = y - (this.y + this.size/2);
-      var distancesq = (diffx * diffx) + (diffy * diffy);
-      var adjustedAmount = (amount / distancesq) * 0.01;
-      this.xvel += diffx * adjustedAmount;
-      this.yvel += diffy * adjustedAmount;
+    destroy: function() {
+      this.raise('Destroyed');
     },
     getPoints: function() {
       return Math.floor(this.size);
     }
   };
-  _.extend(Asteroid.prototype, RenderQuad.prototype);
+  _.extend(Asteroid.prototype, RenderQuad.prototype, HasMass.prototype);
 
   var EnemyFactory = function() {
     Eventable.call(this);
@@ -407,6 +446,8 @@
     this.ticks = 0;
     this.level = 1;
     this.speedseed = 1.0;
+    this.powerups = [];
+    this.populatePowerups();
   };
 
   EnemyFactory.prototype = {
@@ -458,53 +499,177 @@
       if(Math.random() * 10 > 7.0)
         this.createPowerup(x, y);
     },
-    createPowerup: function(x, y) {
-      var powerup = new EnergyBoost(x, y, 300);
-      this.scene.add(powerup);
+    populatePowerups: function() {
+      var self = this;
+      var energyBoost = function(x, y) {
+        var powerup = new EnergyBoost(x, y, 1200);
+        self.scene.add(powerup);
+      };
+      var healthBoost = function(x, y) {
+        var powerup = new HealthBoost(x, y, 1200);
+        self.scene.add(powerup);
+      };
+      var field = function(x, y) {
+        var powerup = new DestructionFieldGenerator(x, y, 1200);
+        self.scene.add(powerup);
+      };
+      var infiniteEnergy = function(x, y) {
+        var powerup = new InfiniteEnergyPowerup(x,  y, 1200);
+        self.scene.add(powerup);
+      };
+      for(var i = 0 ; i < 10; i++) {
+        this.powerups.push(energyBoost);
+        this.powerups.push(healthBoost);
+        if(i % 5 === 0) {
+          this.powerups.push(field);
+          this.powerups.push(infiniteEnergy);
+        }
+      }
+    },
+    createPowerup: function(x, y) {  
+      var selector = Math.floor(Math.random() * this.powerups.length);
+      var func = this.powerups[selector];
+      func(x, y);
     }
   };
   _.extend(EnemyFactory.prototype, Eventable.prototype);
 
   var Powerup = function(x, y, lifetime, width, height) {
     RenderQuad.call(this);
+    HasMass.call(this);
     this.x = x;
     this.y = y;
+    this.xvel = 0;
+    this.yvel = 0;
     this.lifetime = lifetime;
     this.ticks = 0;
     this.width = width;
     this.height = height;
+    this.size = (width + height) / 2.0;
     this.physical = true;
   };
   Powerup.prototype = {
     tick: function() {
       if(this.ticks++ >= this.lifetime)
         return this.scene.remove(this);
+      this.x += this.xvel;
+      this.y += this.yvel;
     },
     notifyCollidedWith: function(other) {
-      if(other instanceof Missile) {
+      if(other instanceof Planet) {
         this.bestow();
+        this.scene.remove(this);
+      }
+      else if(other instanceof Missile) {
         this.scene.remove(this);
       }
     }
   };
-  _.extend(Powerup.prototype, RenderQuad.prototype);
+  _.extend(Powerup.prototype, RenderQuad.prototype, HasMass.prototype);
 
   var EnergyBoost = function(x, y, lifetime) {
     Powerup.call(this, x, y, lifetime, 25, 25);
     this.id = IdGenerator.Next("energyboost-");
-    this.colour = '#FFF';
+    this.colour = '#FF0';
   };
   EnergyBoost.prototype = {
     bestow: function() {
-      // Increase energy levels
       this.scene.with('player', function(player) {
         player.increaseEnergy(10);
       });
-      // Add a message as such
       this.scene.add(new Message(this.x, this.y, "Energy + 10", 90, '#FF0'));
     }
   };
   _.extend(EnergyBoost.prototype, Powerup.prototype);
+
+  var HealthBoost = function(x, y, lifetime) {
+    Powerup.call(this, x, y, lifetime, 25, 25);
+    this.id = IdGenerator.Next("HealthBoost-");
+    this.colour = '#0F0';
+  };
+  HealthBoost.prototype = {
+    bestow: function() {
+      this.scene.with('centre', function(centre) {
+        centre.increaseHealth(10);
+      });
+      this.scene.add(new Message(this.x, this.y, "Health + 10", 90, '#0F0'));
+    }
+  };
+  _.extend(HealthBoost.prototype, Powerup.prototype);
+
+  var DestructionFieldGenerator = function(x, y, lifetime) {
+    Powerup.call(this, x, y, lifetime, 25, 25);
+    this.id = IdGenerator.Next("DestructionFieldGenerator-");
+    this.colour = '#F0F';
+  };
+  DestructionFieldGenerator.prototype = {
+    bestow: function() {
+      this.scene.add(new DestructionField(0,0));
+      this.scene.add(new Message(this.x, this.y, "Destruction Field", 90, '#FFF'));
+    }
+  };
+  _.extend(DestructionFieldGenerator.prototype, Powerup.prototype);
+
+  var InfiniteEnergyPowerup = function(x, y, lifetime) {
+    Powerup.call(this, x, y, lifetime, 25, 25);
+    this.id = IdGenerator.Next("infiniteenergy-");
+    this.colour = '#FF0';
+  };
+  InfiniteEnergyPowerup.prototype = {
+    bestow: function() {
+      this.scene.with('player', function(player) {
+        player.freezeEnergy(90);
+      });
+      this.scene.add(new Message(this.x, this.y, "Infinite Energy", 90, '#FF0'));
+    }
+  };
+  _.extend(InfiniteEnergyPowerup.prototype, Powerup.prototype);
+
+  var DestructionField = function(x, y) {
+    Eventable.call(this);
+    this.id = IdGenerator.Next("DestructionField-");
+    this.radius = 10;
+    this.x = 0;
+    this.y = 0;
+  };
+
+  DestructionField.prototype = {
+    tick: function() {
+      this.radius += 10;
+      if(this.radius % 100 === 0)
+        this.repelInsideField();
+      if(this.radius > 1000)
+        this.scene.remove(this);
+    },
+    repelInsideField: function() {
+      var self = this;
+      this.scene.each(function(entity) {
+        if(entity instanceof Asteroid) {
+          var diffx = entity.x - self.x;
+          var diffy = entity.y - self.y;
+          var distance = Math.sqrt((diffx * diffx) + (diffy * diffy));
+          if(distance > self.radius) return;
+          entity.destroy();
+        }
+      });
+    },
+    draw: function(context) {
+      context.beginPath();
+      var gradient = context.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.radius);
+      gradient.addColorStop(0, "transparent");
+      gradient.addColorStop(0.4, "transparent");
+      gradient.addColorStop(0.4, 'rgba(0, 0, 255, 0.1)');
+      gradient.addColorStop(0.95, 'rgba(0, 0, 255, 0.1)');
+      gradient.addColorStop(0.95, 'rgba(255, 0, 0, 0.1)');
+      gradient.addColorStop(1, "transparent");
+      context.fillStyle = gradient;
+      context.arc(this.x, this.y, this.radius, Math.PI * 2, false);
+      context.fill();
+    }
+  };
+  _.extend(DestructionField.prototype, Eventable.prototype);
+
+
 
   var Missile = function(id, x, y, xvel, yvel) {
     Quad.call(this);
@@ -516,6 +681,7 @@
     this.yvel = yvel;
     this.width = 10;
     this.height = 10;
+    this.ticks = 0;
   };
   Missile.prototype = {
     draw: function(context) {
@@ -530,6 +696,8 @@
       context.fill();
     },
     tick: function() {
+      if(this.ticks > 3200)
+        this.raise('Destroyed');
       this.x = this.x + this.xvel;
       this.y = this.y + this.yvel;
     },
@@ -587,11 +755,14 @@
         case 37:
           this.movingLeft = true;
         break;
+        case 38:
+          this.scene.add(new DestructionField(0,0));
+        break;
         case 39:
           this.movingRight = true;
         break;
         case 17:
-          this.fireMissile();
+          this.firing = true;
         break;
       }
     },
@@ -603,16 +774,14 @@
         case 39:
           this.movingRight = false;
         break;
+        case 17:
+          this.firing = false;
+        break;
       }
     },
     onEntityUpdated: function(data, sender) {
       if(sender.id !== 'player') return;
   //    this.scene.camera.rotateTo(-sender.angle);
-    },
-    fireMissile: function() {
-      this.scene.with('player', function(player) {
-        player.fireMissile();
-      });
     },
     tick: function() {
       var self = this;
@@ -621,6 +790,8 @@
           player.moveLeft();
         else if(self.movingRight)
           player.moveRight();
+        if(self.firing)
+          player.fireMissile();
       });
     }
   };
@@ -748,13 +919,13 @@
     },
     tick: function() {
       if(this.currentZoom > this.desiredZoom)
-        this.currentZoom -= 7.5;
+        this.currentZoom -= 15;
       else if(this.currentZoom < this.desiredZoom)
         this.currentZoom += 30;
       this.scene.camera.zoomTo(this.currentZoom);
 
       if(this.desiredZoom > this.standardZoom)
-        this.desiredZoom -= 7.5;
+        this.desiredZoom -= 15;
       if(this.desiredZoom < this.standardZoom)
         this.desiredZoom = this.standardZoom;      
     }
@@ -951,6 +1122,17 @@
       if(sender.id !== 'player') return;
       var perc = sender.energyPercentage();
       this.energy.css('width', perc + '%');
+    },
+    onEnergyFreezeStart: function(data, sender) {
+      this.energy.css('background-color', '#00F');
+    },
+    onEnergyFreezeEnd: function(data, sender) {
+      this.energy.css('background-color', '#CC0');
+    },
+    onHealed: function(health, sender) {
+      if(sender.id !== 'centre') return;
+      var perc = sender.healthPercentage();
+      this.health.css('width', perc + '%');
     },
     onScoreChanged: function(score, sender) {
       this.score.text(score);
