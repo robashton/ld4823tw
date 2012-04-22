@@ -711,7 +711,7 @@
       context.fill();
     },
     tick: function() {
-      if(this.ticks > 3200)
+      if(this.ticks++ > 3200)
         this.raise('Destroyed');
       this.x = this.x + this.xvel;
       this.y = this.y + this.yvel;
