@@ -119,6 +119,17 @@
         console.warn('Missing texture', path);
       return texture;
     },
+    playSound: function(path) {
+      var player = new Audio();
+      console.log(path);
+      if(player.canPlayType("audio/mpeg")) {
+        player.src = "data:audio/mpeg;base64," + this.findData(path + '.mp3');
+      } else {
+        player.src = "data:audio/ogg;base64," + this.findData(path + '.ogg');
+      }
+      console.log(player.src);
+      player.play();
+    },
     fromCacheOrCreate: function(path, createCallback) {
       var item = this.cachedResources[path];
       if(item) return item;
@@ -372,6 +383,7 @@
         self.energy -= 2.0;
       } 
       self.raise('Fired');
+      GlobalResources.playSound('assets/shoot');
     },
     updateRenderCoords: function() {
       var self = this;
@@ -498,6 +510,7 @@
       this.scene.add(explosion);
       if(Math.random() * 10 > 7.0)
         this.createPowerup(x, y);
+      GlobalResources.playSound('assets/explosion');
     },
     populatePowerups: function() {
       var self = this;

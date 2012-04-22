@@ -19,7 +19,11 @@ http.createServer(function(req, res) {
 
 swallow.build({
   in: 'assets',
-  out: 'site/assets.json'
+  out: 'site/assets.json',
+  extraHandlers: [
+    swallow.handlers.byExtension('.ogg', swallow.handlers.binary),
+    swallow.handlers.byExtension('.mp3', swallow.handlers.binary)
+  ]
 }, function() {
   console.log('assets built');
 });
