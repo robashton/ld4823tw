@@ -264,8 +264,10 @@
       entity.rotation = angle;
     },
     damage: function(amount) {
-      this.health--;
+      this.health -= amount * 10;
       this.raise('Damaged')
+      if(this.health <= 0)
+        this.raise('Destroyed');
     },
     healthPercentage: function() {
       return (this.health / this.maxhealth) * 100;
@@ -350,7 +352,7 @@
     },
     notifyCollidedWith: function(other) {
       if(other.id === 'centre')
-        other.damage(5);
+        other.damage(10);
       if(other instanceof Asteroid) return;
       this.raise('Destroyed');
     },
@@ -515,6 +517,20 @@
     }
   };
 
+  var Explosion = function(id) {
+    Eventable.call(this);
+    this.id = id;
+  };
+  Explosion.prototype = {
+    draw: function() {
+
+    },
+    tick: function() {
+
+    }
+  };
+  _.extend(Explosion.prototype, Eventable.prototype);
+
   var Collision = function() {
     Eventable.call(this);
     this.id = "collision";
@@ -592,15 +608,19 @@
   _.extend(ScoreKeeper.prototype, Eventable.prototype);
 
   var BasicMap = function() {
-
+    Eventable.call(this);
+    this.planet = null;
+    this.scene = null;
   };
 
   BasicMap.prototype = {
     loadInto: function(scene) {
-
+      this.scene = scene;
       // Create the planet we're protecting
-      var planet = new Planet('centre', 'assets/basicplanet.png', 0, 0, 128);
-      scene.add(planet);
+      this.planet = new Planet('centre', 'assets/basicplanet.png', 0, 0, 128);
+      scene.add(this.planet);
+
+      this.planet.on('Destroyed', this.onPlanetDestroyed, this);
 
       // Start off above the polar north of the planet
       scene.camera.moveTo(0, -100);
@@ -612,8 +632,15 @@
     },
     getSurfaceHeight: function() {
       return 512;
+    },
+    onPlanetDestroyed: function() {
+      this.scene.remove(this.planet);
+
+      // TODO: Explosion before this
+      this.raise('GameOver');
     }
   };
+  _.extend(BasicMap.prototype, Eventable.prototype);
 
   var Hud = function(scene) {
     this.scene = scene;
@@ -678,10 +705,18 @@
     },
     loadMap: function(map) {
       map.loadInto(this.scene);
+      map.on('GameOver', this.onGameOver, this);
     },
     createPlayer: function() {
       var player = new Player();
       this.scene.add(player);
+    },
+    onGameOver: function() {
+      $('#gameover').show();
+      $('#final-score').text(this.scorekeeper.score);
+      $('#try-again').click(function() {
+        document.location = document.location;
+      });
     }
   };
 
