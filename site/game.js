@@ -121,13 +121,12 @@
     },
     playSound: function(path) {
       var player = new Audio();
-      console.log(path);
       if(player.canPlayType("audio/mpeg")) {
         player.src = "data:audio/mpeg;base64," + this.findData(path + '.mp3');
       } else {
         player.src = "data:audio/ogg;base64," + this.findData(path + '.ogg');
       }
-      console.log(player.src);
+      player.volume = 0.5;
       player.play();
     },
     fromCacheOrCreate: function(path, createCallback) {
@@ -573,9 +572,11 @@
       if(other instanceof Planet) {
         this.bestow();
         this.scene.remove(this);
+        GlobalResources.playSound('assets/pickup');
       }
       else if(other instanceof Missile) {
         this.scene.remove(this);
+        GlobalResources.playSound('assets/sad');
       }
     }
   };
