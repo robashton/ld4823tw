@@ -4,7 +4,7 @@ var
   paperboy = require('paperboy')
   swallow = require('swallow')
 
-  PORT = 8000,
+  PORT = ENV.port || 8000,
   WEBROOT = path.join(path.dirname(__filename), 'site');
 
 http.createServer(function(req, res) {
