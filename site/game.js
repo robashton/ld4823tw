@@ -332,6 +332,10 @@
       this.angle += this.speed;
       this.dirty = true;
     },
+    increaseEnergy: function(amount) {
+      this.energy = Math.min(this.energy + amount, this.maxenergy);
+      this.raise('EnergyIncreased');
+    },
     fireMissile: function() {
       var self = this;
       if(this.energy <= 0) return;
@@ -404,6 +408,7 @@
     this.level = 1;
     this.speedseed = 1.0;
   };
+
   EnemyFactory.prototype = {
     onAddedToScene: function() {
       this.scene.on('LevelChanged', this.onLevelChanged, this);
@@ -450,9 +455,56 @@
         lifetime: 120       
       });
       this.scene.add(explosion);
+      if(Math.random() * 10 > 7.0)
+        this.createPowerup(x, y);
+    },
+    createPowerup: function(x, y) {
+      var powerup = new EnergyBoost(x, y, 300);
+      this.scene.add(powerup);
     }
   };
   _.extend(EnemyFactory.prototype, Eventable.prototype);
+
+  var Powerup = function(x, y, lifetime, width, height) {
+    RenderQuad.call(this);
+    this.x = x;
+    this.y = y;
+    this.lifetime = lifetime;
+    this.ticks = 0;
+    this.width = width;
+    this.height = height;
+    this.physical = true;
+  };
+  Powerup.prototype = {
+    tick: function() {
+      if(this.ticks++ >= this.lifetime)
+        return this.scene.remove(this);
+    },
+    notifyCollidedWith: function(other) {
+      if(other instanceof Missile) {
+        this.bestow();
+        this.scene.remove(this);
+      }
+    }
+  };
+  _.extend(Powerup.prototype, RenderQuad.prototype);
+
+  var EnergyBoost = function(x, y, lifetime) {
+    Powerup.call(this, x, y, lifetime, 25, 25);
+    this.id = IdGenerator.Next("energyboost-");
+    this.colour = '#FFF';
+  };
+  EnergyBoost.prototype = {
+    bestow: function() {
+      // Increase energy levels
+      this.scene.with('player', function(player) {
+        player.increaseEnergy(10);
+      });
+      // Add a message as such
+      this.scene.add(new Message(this.x, this.y, "Energy + 10", 90, '#FF0'));
+    }
+  };
+  _.extend(EnergyBoost.prototype, Powerup.prototype);
 
   var Missile = function(id, x, y, xvel, yvel) {
     Quad.call(this);
