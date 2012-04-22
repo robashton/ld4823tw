@@ -1,1 +1,34 @@
-This is my LD48-23 entry, "tiny worlds" - no idea what I am making yet
+This is my LD48-23 entry, "tiny worlds" - a tiny-earth protector game
+
+TODO: Saturday
+- Proof of concept
+- Skeleton
+- Mooch around and watch Star Trek
+- Drink some wine
+- Eat some MEAT
+
+TODO: Sunday
+----------
+- CORE
+----------
+
+- Add start screen
+- Scoring
+- Add game over screen with score
+- Place player in low orbit rather than on earth
+- Better graphics
+- Sounds
+- Gets harder as you go on
+
+----------
+- OPTIONAL
+----------
+
+- Particles
+- Explosions
+- Power-ups
+  - Health++;
+  - Energy++;
+  - Scatter gun     (Lasts for N seconds)
+  - Homing missiles (Lasts for N seconds)
+  - Repel Field     (Pushes back all current asteroids as soon as picked up)
