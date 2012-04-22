@@ -154,7 +154,7 @@
       this.entitiesIndex.push(entity);
       entity.scene = this;
       entity.onAny(this.onEntityEvent, this);
-      if(entity.onAddedToScene) entity.onAddedToScene(this);
+      if(entity.onAddedToScene) entity.onAddedToScene();
     },
     remove: function(entity) {
       delete this.entities[entity.id];
@@ -252,12 +252,13 @@
     this.x = x;
     this.y = y;
     this.health = this.maxhealth = 100;
-    this.gravity = (radius * 0.5) + 200;
+    this.gravity = radius;
   };
   Planet.prototype = {
-    placeOnSurface: function(entity, angle) {
-      var x = this.x + this.radius * Math.cos(angle);
-      var y = this.y + this.radius * Math.sin(angle);
+    placeOnSurface: function(entity, angle, height) {
+      height = height || 0;
+      var x = this.x + (this.radius + height) * Math.cos(angle);
+      var y = this.y + (this.radius + height) * Math.sin(angle);
       entity.x = x;
       entity.y = y - entity.height;
       entity.rotation = angle;
@@ -317,7 +318,7 @@
     updateRenderCoords: function() {
       var self = this;
       this.scene.with('centre', function(planet) {
-        planet.placeOnSurface(self, self.angle - (Math.PI / 2));
+        planet.placeOnSurface(self, self.angle - (Math.PI / 2), 20);
       });
       this.dirty = false;
       this.raise('Updated');
@@ -345,9 +346,7 @@
     tick: function() {
       this.x += this.xvel;
       this.y += this.yvel;
-      this.rotation += 0.01;
-      this.xvel *= 0.68;
-      this.yvel *= 0.68;
+      this.rotation += 0.1;
     },
     notifyCollidedWith: function(other) {
       if(other.id === 'centre')
@@ -359,9 +358,12 @@
       var diffx = x - (this.x + this.size/2);
       var diffy = y - (this.y + this.size/2);
       var distancesq = (diffx * diffx) + (diffy * diffy);
-      var adjustedAmount = amount / distancesq;
+      var adjustedAmount = (amount / distancesq) * 0.01;
       this.xvel += diffx * adjustedAmount;
       this.yvel += diffy * adjustedAmount;
+    },
+    getPoints: function() {
+      return Math.floor(this.size);
     }
   };
   _.extend(Asteroid.prototype, Quad.prototype);
@@ -383,14 +385,16 @@
       var ydir = Math.sin(angle);
       var x = 1500 * xdir;
       var y = 1500 * ydir;
+
+      var speed = 1.0 + Math.random() * 1.0;
+      var accuracy = 1.0 - Math.random() * 2.0;
+      var xvel = speed * ((-xdir) + accuracy);
+      var yvel = speed * ((-ydir) - accuracy);
       var size = 40 + Math.random() * 50;
-      this.emitAt(x, y, size);
+      this.emitAt(x, y, size, xvel, yvel);
     },
-    emitAt: function(x, y, size) {
-      var speed = 2.0 + Math.random() * 3.0;
+    emitAt: function(x, y, size, xvel, yvel) {
       var id = IdGenerator.Next('asteroid-');
-      var xvel = speed * (1.0 - (Math.random() * 2.0));
-      var yvel = speed * (1.0 - (Math.random() * 2.0));
       var asteroid = new Asteroid(id, size, x, y, xvel, yvel);
       this.scene.add(asteroid);
       asteroid.on('Destroyed', this.onAsteroidDestroyed, this);
@@ -398,13 +402,6 @@
     onAsteroidDestroyed: function(data, sender) {
       this.scene.remove(sender);
       sender.off('Destroyed', this.onAsteroidDestroyed, this);
-      this.determineAsteroidForking(sender);
-    },
-    determineAsteroidForking: function(asteroid) {
-      if(asteroid.size > 70) {
-        this.emitAt(asteroid.x, asteroid.y, asteroid.size / 2);
-        this.emitAt(asteroid.x, asteroid.y, asteroid.size / 2);
-      }
     }
   };
   _.extend(EnemyFactory.prototype, Eventable.prototype);
@@ -427,6 +424,10 @@
       this.y = this.y + this.yvel;
     },
     notifyCollidedWith: function(other) {
+      if(other.getPoints) {
+        var points = other.getPoints();
+        this.raise('PointsGained', points);
+      }
       this.raise('Destroyed');
     }
   };
@@ -546,13 +547,13 @@
 
   var CameraController = function(standardZoom) {
     Eventable.call(this);
+    this.id = "cameracontroller";
     this.standardZoom = standardZoom;
     this.currentZoom = standardZoom;
     this.desiredZoom = standardZoom;
   };
   CameraController.prototype = {
-    onAddedToScene: function(scene) {
-      this.scene = scene;
+    onAddedToScene: function() {
       this.scene.autoHook(this);
     },
     onFired: function() {
@@ -573,6 +574,23 @@
   };
   _.extend(CameraController.prototype, Eventable.prototype);
 
+  var ScoreKeeper = function() {
+    Eventable.call(this);
+    this.id = "scorekeeper";
+    this.level = 1;
+    this.score = 0;
+  };
+  ScoreKeeper.prototype = {
+    onAddedToScene: function() {
+      this.scene.autoHook(this);
+    },
+    onPointsGained: function(points, sender) {
+      this.score += points * this.level;
+      this.raise('ScoreChanged', this.score);
+    }
+  };
+  _.extend(ScoreKeeper.prototype, Eventable.prototype);
+
   var BasicMap = function() {
 
   };
@@ -581,15 +599,15 @@
     loadInto: function(scene) {
 
       // Create the planet we're protecting
-      var planet = new Planet('centre', 'assets/basicplanet.png', 0, 0, 512);
+      var planet = new Planet('centre', 'assets/basicplanet.png', 0, 0, 128);
       scene.add(planet);
 
       // Start off above the polar north of the planet
-      scene.camera.moveTo(0, -700);
-      scene.camera.zoomTo(1000);
+      scene.camera.moveTo(0, -100);
+      scene.camera.zoomTo(100);
       scene.add(new EnemyFactory());
       
-      var controller = new CameraController(1000); 
+      var controller = new CameraController(2000); 
       scene.add(controller);
     },
     getSurfaceHeight: function() {
@@ -600,6 +618,7 @@
   var Hud = function(scene) {
     this.scene = scene;
     this.scene.autoHook(this);
+    this.score = $('#score');
     this.health = $('#health');
     this.energy = $('#energy');
   };
@@ -618,6 +637,9 @@
       if(sender.id !== 'player') return;
       var perc = sender.energyPercentage();
       this.energy.css('width', perc + '%');
+    },
+    onScoreChanged: function(score, sender) {
+      this.score.text(score);
     }
   };
 
@@ -630,6 +652,7 @@
     this.missiles = new MissileControl();
     this.hud = new Hud(this.scene);
     this.collision = new Collision();
+    this.scorekeeper = new ScoreKeeper();
   };
 
   Game.prototype = {
@@ -639,6 +662,7 @@
         self.loadMap(new BasicMap())
         self.scene.add(self.missiles);
         self.scene.add(self.collision);
+        self.scene.add(self.scorekeeper);
         self.createPlayer();
         self.startTimers();
       });

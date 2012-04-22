@@ -2,27 +2,23 @@
   <head>
     <title></title>
     <link rel="stylesheet" type="text/css" href="style.css"></link>
-    <script type="text/javascript" src="underscore-min.js"></script>
-    <script type="text/javascript" src="hammer.js"></script>
     <script type="text/javascript" src="jquery-1.7.2.min.js"></script>
-    <script type="text/javascript" src="camera.js"></script>
-    <script type="text/javascript" src="game.js"></script>
+    <script type="text/javascript">
+      $(document).ready(function() {
+        $('#play').click(function(){
+          document.location = 'game.html';
+        })
+      });
+    </script>
   </head>
   <body>
-    <div id="container">
-      <canvas id="target" width="800" height="600">
-        Your browser doesn't appear to support canvas, sorry
-      </canvas>
-      <div id="amounts">
-        <span>Planet:</span>
-        <div id="healthcontainer">
-          <div id="health"></div>
-        </div> 
-        <span>Weapons:</span>
-        <div id="energycontainer">
-          <div id="energy"></div>
-        </div>
-      </div>
+    <div id="description">
+      <h1>Tiny Defensive</h1>
+      <p>The year is... well it isn't really important</p>
+      <p>You are controlling a tiny-world-sat defensive unit, and charged with the protection of the tiny-world from the increasing number of asteroids and other such space debris that for some inexplicable reason keep coming your way</p>
+      <p>Use the arrow keys to move the defensive-unit, and 'ctrl' to fire - good luck!</p>
+
+      <div id="play">Play</div>
     </div>
   </body>
 

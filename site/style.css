@@ -8,7 +8,7 @@ body {
   height: 75%;
 }
 
-#amounts {
+#amounts, #score-container {
   width: 100%;
   background-color: #000;
   color: #EEE;
@@ -17,7 +17,7 @@ body {
   border: 1px solid #000;
 }
 
-#amounts span {
+#amounts span, #score-container span {
   clear: left;
   width: 15%;
   float: left;
@@ -25,7 +25,7 @@ body {
   margin-top: 5px;
 }
 
-#amounts div {
+#amounts div, #score-container div {
   width: 75%;
   float: left;
 }
@@ -36,6 +36,13 @@ body {
   margin-top: 5px;issi
   margin-left: 10px;
   width: 100%;
+}
+
+#score {
+  font-size: 18px;
+  height: 60px;
+  margin-top: 5px;
+  margin-left: 10px;
 }
 
 #health {
@@ -49,4 +56,21 @@ body {
 .break {
   clear: both;
   float: none;
+}
+
+#description {
+  background-color: #DDD;
+  padding: 30px;
+}
+
+#play {
+  cursor: pointer;
+  width: 200px;
+  height: 100px;
+  margin-left: 10px;
+  font-size: 64px;
+  background-color: #DD0;
+  -moz-box-shadow: 10px 10px 5px #000;
+  -webkit-box-shadow: 10px 10px 5px #000;
+  box-shadow: 10px 10px 5px #000;
 }
