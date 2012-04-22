@@ -771,7 +771,7 @@
           this.movingLeft = true;
         break;
         case 38:
-          this.scene.add(new DestructionField(0,0));
+        //  this.scene.add(new DestructionField(0,0));
         break;
         case 39:
           this.movingRight = true;
@@ -1159,6 +1159,7 @@
 
   var Game = function() {
     this.canvas = document.getElementById('target');
+    this.sizeupCanvas();
     this.context = this.canvas.getContext('2d');
     this.camera = new Camera(this.context);
     this.scene = new Scene(this.camera);
@@ -1172,6 +1173,12 @@
   };
 
   Game.prototype = {
+    sizeupCanvas: function() {
+      var ele = $(this.canvas);
+      ele
+        .attr('width', ele.width() + 'px')
+        .attr('height', ele.height() + 'px');
+    },
     start: function() {
       var self = this;
       GlobalResources.load('assets.json', function() {
