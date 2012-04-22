@@ -186,7 +186,7 @@
       });
       this.camera.end();
     },
-    with: function(id, cb) {
+    withEntity: function(id, cb) {
       var entity = this.entities[id];
       if(entity) cb(entity);
     },
@@ -370,7 +370,7 @@
       if(this.energy <= 0) return;
       if(this.ticks++ !== 0) return;
 
-      this.scene.with('missilecontrol', function(missilecontrol) {
+      this.scene.withEntity('missilecontrol', function(missilecontrol) {
         missilecontrol.fire(self.x, self.y, self.angle, 5.0);
       });
 
@@ -386,7 +386,7 @@
     },
     updateRenderCoords: function() {
       var self = this;
-      this.scene.with('centre', function(planet) {
+      this.scene.withEntity('centre', function(planet) {
         planet.placeOnSurface(self, self.angle - (Math.PI / 2), 20);
       });
       this.dirty = false;
@@ -589,7 +589,7 @@
   };
   EnergyBoost.prototype = {
     bestow: function() {
-      this.scene.with('player', function(player) {
+      this.scene.withEntity('player', function(player) {
         player.increaseEnergy(10);
       });
       this.scene.add(new Message(this.x, this.y, "Energy + 10", 90, '#FF0'));
@@ -604,7 +604,7 @@
   };
   HealthBoost.prototype = {
     bestow: function() {
-      this.scene.with('centre', function(centre) {
+      this.scene.withEntity('centre', function(centre) {
         centre.increaseHealth(10);
       });
       this.scene.add(new Message(this.x, this.y, "Health + 10", 90, '#0F0'));
@@ -632,7 +632,7 @@
   };
   InfiniteEnergyPowerup.prototype = {
     bestow: function() {
-      this.scene.with('player', function(player) {
+      this.scene.withEntity('player', function(player) {
         player.freezeEnergy(90);
       });
       this.scene.add(new Message(this.x, this.y, "Infinite Energy", 90, '#FF0'));
@@ -800,7 +800,7 @@
     },
     tick: function() {
       var self = this;
-      this.scene.with('player', function(player) {
+      this.scene.withEntity('player', function(player) {
         if(self.movingLeft)
           player.moveLeft();
         else if(self.movingRight)
@@ -852,7 +852,7 @@
     },
     tick: function() {
       var self = this;
-      this.scene.with('explosionoverlay', function(overlay) {
+      this.scene.withEntity('explosionoverlay', function(overlay) {
         overlay.register(self);
       });
     },
@@ -986,7 +986,7 @@
   Message.prototype = {
     tick: function() {
       var self = this;
-      this.scene.with('textoverlay', function(overlay) {
+      this.scene.withEntity('textoverlay', function(overlay) {
         overlay.register(self);
       });
       this.y -= 1.0;
