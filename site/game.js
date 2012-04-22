@@ -201,7 +201,7 @@
   };
   _.extend(Scene.prototype, Eventable.prototype);
 
-  var Quad = function() {
+  var RenderQuad = function() {
     Eventable.call(this);
     this.colour = '#FFF';
     this.x = -2;
@@ -211,7 +211,7 @@
     this.rotation = 0;
     this.physical = false;
   };
-  Quad.prototype = {
+  RenderQuad.prototype = {
     draw: function(context) {
       context.save();
       context.translate(this.x, this.y);
@@ -234,7 +234,7 @@
       return (diff < myradius + oradius);
     }
   };
-  _.extend(Quad.prototype, Eventable.prototype);
+  _.extend(RenderQuad.prototype, Eventable.prototype);
 
   IdGenerator = {
     Next: function(prefix) {
@@ -243,7 +243,7 @@
   };
 
   var Planet = function(id, texture, x, y, radius) {
-    Quad.call(this);
+    RenderQuad.call(this);
     this.physical = true;
     this.radius = radius;
     this.id = id;
@@ -276,10 +276,10 @@
       other.applyGravity(this.gravity, this.x, this.y);
     }
   };
-  _.extend(Planet.prototype, Quad.prototype);
+  _.extend(Planet.prototype, RenderQuad.prototype);
 
   var Player = function() {
-    Quad.call(this);
+    RenderQuad.call(this);
     this.id = 'player';
     this.angle = 0;
     this.colour = '#FFF';
@@ -329,10 +329,10 @@
       return (this.energy / this.maxenergy) * 100;
     }
   };
-  _.extend(Player.prototype, Quad.prototype);
+  _.extend(Player.prototype, RenderQuad.prototype);
 
   var Asteroid = function(id, size, x, y, xvel, yvel) {
-    Quad.call(this);
+    RenderQuad.call(this);
     this.physical = true;
     this.id = id;
     this.x = x;
@@ -368,7 +368,7 @@
       return Math.floor(this.size);
     }
   };
-  _.extend(Asteroid.prototype, Quad.prototype);
+  _.extend(Asteroid.prototype, RenderQuad.prototype);
 
   var EnemyFactory = function() {
     Eventable.call(this);
@@ -404,12 +404,17 @@
     onAsteroidDestroyed: function(data, sender) {
       this.scene.remove(sender);
       sender.off('Destroyed', this.onAsteroidDestroyed, this);
+      this.createAsteroidExplosion(sender.x, sender.y);
+    },
+    createAsteroidExplosion: function(x, y) {
+      var explosion = new Explosion(IdGenerator.Next('explosion-'), x, y);
+      this.scene.add(explosion);
     }
   };
   _.extend(EnemyFactory.prototype, Eventable.prototype);
 
   var Missile = function(id, x, y, xvel, yvel) {
-    Quad.call(this);
+    RenderQuad.call(this);
     this.physical = true;
     this.id = id;
     this.x = x;
@@ -433,7 +438,7 @@
       this.raise('Destroyed');
     }
   };
-  _.extend(Missile.prototype, Quad.prototype);
+  _.extend(Missile.prototype, RenderQuad.prototype);
 
   var MissileControl = function() {
     Eventable.call(this);
@@ -499,7 +504,7 @@
     },
     onEntityUpdated: function(data, sender) {
       if(sender.id !== 'player') return;
-      this.scene.camera.rotateTo(-sender.angle);
+  //    this.scene.camera.rotateTo(-sender.angle);
     },
     fireMissile: function() {
       this.scene.with('player', function(player) {
@@ -517,16 +522,64 @@
     }
   };
 
-  var Explosion = function(id) {
+  var Particle = function(x, y, velx, vely, size, colour) {
+    this.x = x;
+    this.y = y;
+    this.velx = velx;
+    this.vely = vely;
+    this.size = size;
+    this.colour = colour;
+  };
+  Particle.prototype = {};
+
+  var Explosion = function(id, x, y, cfg) {
     Eventable.call(this);
+    cfg = cfg || {};
+
     this.id = id;
+    this.particles = [];
+    this.amount = cfg.amount || 10;
+    this.lifetime = cfg.lifetime || 60;
+    this.ticks = 0;
+    this.x = x;
+    this.y = y;
+    this.initParticles();
   };
   Explosion.prototype = {
-    draw: function() {
-
+    initParticles: function() {
+      for(var i = 0 ; i < this.amount ; i++) {
+        var velx = 1.0 - Math.random() * 2.0;
+        var vely = 1.0 - Math.random() * 2.0;
+        var size = 5.0 + Math.random() * 5.0;
+        var colour = '#F00';
+        this.particles.push(new Particle(this.x, this.y, velx, vely, size, colour));
+      }
     },
-    tick: function() {
+    draw: function(context) { 
+      if(this.ticks++ > this.lifetime)
+        return this.finished();   
+      for(var i = 0; i < this.amount ; i++) {
+        var particle = this.particles[i];
+        this.updateParticle(particle);
 
+        context.beginPath();
+        var gradient = context.createRadialGradient(particle.x, particle.y, 0, particle.x, particle.y, particle.size);
+        gradient.addColorStop(0, "white");
+        gradient.addColorStop(0.4, "white");
+        gradient.addColorStop(0.4, particle.colour);
+        gradient.addColorStop(1, "black");
+        context.fillStyle = gradient;
+        context.arc(particle.x, particle.y, particle.size, Math.PI * 2, false);
+        context.fill();
+      }
+    },
+    finished: function() {
+      this.raise('Finished');
+      this.scene.remove(this);
+    },
+    updateParticle: function(particle) {
+      particle.x += particle.velx;
+      particle.y += particle.vely;
     }
   };
   _.extend(Explosion.prototype, Eventable.prototype);
@@ -699,7 +752,12 @@
       setInterval(function() {
         self.controller.tick();
         self.scene.tick();
-        self.canvas.width = self.canvas.width;
+        
+        self.context.globalCompositionOperation = 'source-over';
+        self.context.fillStyle = 'rgba(0, 0, 0, 0.1)';
+        self.context.fillRect(0, 0, self.canvas.width, self.canvas.height);
+        self.context.globalCompositionOperation = 'lighter';
+
         self.scene.draw(self.context);
       }, 100 / 3);
     },
