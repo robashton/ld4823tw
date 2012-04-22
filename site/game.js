@@ -554,6 +554,7 @@
         return this.scene.remove(this);
       this.x += this.xvel;
       this.y += this.yvel;
+      this.rotation += 0.1;
     },
     notifyCollidedWith: function(other) {
       if(other instanceof Planet) {
@@ -568,9 +569,9 @@
   _.extend(Powerup.prototype, RenderQuad.prototype, HasMass.prototype);
 
   var EnergyBoost = function(x, y, lifetime) {
-    Powerup.call(this, x, y, lifetime, 25, 25);
+    Powerup.call(this, x, y, lifetime, 50, 50);
     this.id = IdGenerator.Next("energyboost-");
-    this.colour = '#FF0';
+    this.colour = GlobalResources.getTexture('assets/star.png');
   };
   EnergyBoost.prototype = {
     bestow: function() {
@@ -583,9 +584,9 @@
   _.extend(EnergyBoost.prototype, Powerup.prototype);
 
   var HealthBoost = function(x, y, lifetime) {
-    Powerup.call(this, x, y, lifetime, 25, 25);
+    Powerup.call(this, x, y, lifetime, 50, 50);
     this.id = IdGenerator.Next("HealthBoost-");
-    this.colour = '#0F0';
+    this.colour = GlobalResources.getTexture('assets/heart.png');
   };
   HealthBoost.prototype = {
     bestow: function() {
@@ -598,9 +599,9 @@
   _.extend(HealthBoost.prototype, Powerup.prototype);
 
   var DestructionFieldGenerator = function(x, y, lifetime) {
-    Powerup.call(this, x, y, lifetime, 25, 25);
+    Powerup.call(this, x, y, lifetime, 50, 50);
     this.id = IdGenerator.Next("DestructionFieldGenerator-");
-    this.colour = '#F0F';
+    this.colour = GlobalResources.getTexture('assets/destruction.png');
   };
   DestructionFieldGenerator.prototype = {
     bestow: function() {
@@ -611,9 +612,9 @@
   _.extend(DestructionFieldGenerator.prototype, Powerup.prototype);
 
   var InfiniteEnergyPowerup = function(x, y, lifetime) {
-    Powerup.call(this, x, y, lifetime, 25, 25);
+    Powerup.call(this, x, y, lifetime, 50, 50);
     this.id = IdGenerator.Next("infiniteenergy-");
-    this.colour = '#FF0';
+    this.colour = GlobalResources.getTexture('assets/infinite.png');
   };
   InfiniteEnergyPowerup.prototype = {
     bestow: function() {
