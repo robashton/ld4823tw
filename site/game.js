@@ -266,7 +266,7 @@
       this.scene.on('LevelChanged', this.onLevelChanged, this);
     },
     onLevelChanged: function(level) {
-      this.gravity = this.radius * (level * 2.0);
+      this.gravity = this.radius * (level * 4.0);
     },
     placeOnSurface: function(entity, angle, height) {
       height = height || 0;
@@ -336,7 +336,7 @@
       var self = this;
       if(this.energy <= 0) return;
       this.scene.with('missilecontrol', function(missilecontrol) {
-        missilecontrol.fire(self.x, self.y, self.angle, 3.0);
+        missilecontrol.fire(self.x, self.y, self.angle, 5.0);
       });
       self.energy -= 2.0;
       self.raise('Fired');
@@ -411,7 +411,7 @@
     onLevelChanged: function(level) {
       this.level = level;
       this.rate = Math.max(90 - (level * 10), 30);
-      this.speedseed = 1.0 + (level * 0.05);
+      this.speedseed = 1.0 + (level * 0.01);
     },
     tick: function() {
       if(++this.ticks % this.rate === 0)
@@ -425,7 +425,7 @@
       var y = 1500 * ydir;
 
       var speed = 1.0 + Math.random() * this.speedseed;
-      var accuracy = 1.0 - Math.random() * 2.0;
+      var accuracy = 2.0 - Math.random() * 4.0;
       var xvel = speed * ((-xdir) + accuracy);
       var yvel = speed * ((-ydir) - accuracy);
       var size = 40 + Math.random() * 50;
@@ -446,7 +446,7 @@
       var explosion = new Explosion(IdGenerator.Next('explosion-'), x, y, {
         r: 1.0,
         g: 0.5,
-        b: 0.01 ,
+        b: 0.01,
         lifetime: 120       
       });
       this.scene.add(explosion);
@@ -501,7 +501,7 @@
       var xvel = Math.cos(angle) * speed;
       var yvel = Math.sin(angle) * speed;
       var id = IdGenerator.Next('missile-');
-      var missile = new Missile(id, x + (xvel * 10), y + (yvel * 10), xvel, yvel);
+      var missile = new Missile(id, x + (xvel * 2), y + (yvel * 3), xvel, yvel);
       missile.on('Destroyed', this.onMissileDestroyed, this);;
       this.scene.add(missile);      
     },
@@ -630,9 +630,9 @@
         context.beginPath();
         var gradient = context.createRadialGradient(particle.x, particle.y, 0, particle.x, particle.y, particle.size);
         gradient.addColorStop(0, "white");
-        gradient.addColorStop(0.4, "white");
-        gradient.addColorStop(0.4, particle.colour);
-        gradient.addColorStop(1, "black");
+        gradient.addColorStop(0.1, "white");
+        gradient.addColorStop(0.1, particle.colour);
+        gradient.addColorStop(1, "transparent");
         context.fillStyle = gradient;
         context.arc(particle.x, particle.y, particle.size, Math.PI * 2, false);
         context.fill();
@@ -723,7 +723,7 @@
       points *= this.level;
       this.score += points;
       this.raise('ScoreChanged', this.score);
-      this.scene.add(new Message(sender.x, sender.y, points, 30, '#F00'));
+      this.scene.add(new Message(sender.x, sender.y, points, 30, '#F0F'));
     },
     onLevelChanged: function(level) {
       this.level = level;
@@ -746,11 +746,12 @@
       var self = this;
       this.scene.with('textoverlay', function(overlay) {
         overlay.register(self);
-      })
+      });
+      this.y -= 1.0;
     },
     fill: function(context) {
       context.fillStyle = this.colour;
-      context.font = "24pt Helvetica";
+      context.font = "32pt Helvetica";
       context.fillText(this.message, this.x, this.y);
       if(this.ticks++ >= this.duration)
         this.scene.remove(this);
@@ -763,7 +764,7 @@
     this.id = "bastard";
     this.level = 1;
     this.score = 0;
-    this.threshold = 500;
+    this.update();
   };
   Bastard.prototype = {
     onAddedToScene: function() {
@@ -783,7 +784,7 @@
       this.update();
     },
     update: function() {
-      this.threshold = this.level * 500;
+      this.threshold = (this.level * this.level) * 400;
       this.raise('LevelChanged', this.level);
     }
   };
@@ -847,22 +848,20 @@
       var bastard = new Bastard();
       scene.add(bastard);
 
-
       scene.add(new Message(-80, -200, "3", 30, '#F00'));
 
       setTimeout(function() {
         scene.add(new Message(-80, -200, "2", 30, '#F00'));
-      },1000);
+      }, 1000);
 
       setTimeout(function() {
         scene.add(new Message(-80, -200, "1", 30, '#F00'));
-      },2000);
+      }, 2000);
      
       setTimeout(function() {
         var controller = new CameraController(500, 2000); 
         scene.add(controller);
         scene.add(new Message(-80, -200, "GO GO GO", 90, '#F00'));
-              bastard.changeLevel(10);
       }, 3000)
     },
     getSurfaceHeight: function() {
@@ -930,10 +929,11 @@
         self.scene.add(self.missiles);
         self.scene.add(self.collision);
         self.scene.add(self.scorekeeper);
-        self.scene.add(self.explosionoverlay);
-        self.scene.add(self.textoverlay);
         self.loadMap(new BasicMap())
         self.createPlayer();
+        self.scene.add(self.explosionoverlay);
+        self.scene.add(self.textoverlay);
+        
         self.startTimers();
       });
     },
